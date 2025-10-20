@@ -28,31 +28,33 @@ var statusElement=document.getElementById("status"),progressElement=document.get
 <script>
 (function(){
   function attach(){
-    var canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
     if (!canvas) return false;
 
-    // Make sure cursor is hidden and browser gestures don't interfere
     canvas.style.cursor = 'none';
     canvas.style.touchAction = 'none';
 
-    var twoFinger = false;
-    var lastCenter = {x:0,y:0};
-    var lastDist = 0;
+    let twoFinger = false;
+    let lastCenter = {x:0, y:0};
+    let lastDist = 0;
+    let lastMoveTime = 0;
+    let smoothX = 0, smoothY = 0;
 
-    function center(t){
-      return { x: (t[0].clientX + t[1].clientX)/2,
-               y: (t[0].clientY + t[1].clientY)/2 };
-    }
-    function distance(a,b){ return Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY); }
+    const center = t => ({
+      x: (t[0].clientX + t[1].clientX) / 2,
+      y: (t[0].clientY + t[1].clientY) / 2
+    });
+    const distance = (a,b) => Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
 
-    canvas.addEventListener('touchstart', function(e){
-      if (e.touches.length === 2){
+    // Start pan/zoom
+    canvas.addEventListener('touchstart', e => {
+      if (e.touches.length === 2) {
         e.preventDefault();
         twoFinger = true;
         lastCenter = center(e.touches);
-        lastDist   = distance(e.touches[0], e.touches[1]);
-
-        // Begin right-button drag for map pan
+        smoothX = lastCenter.x;
+        smoothY = lastCenter.y;
+        lastDist = distance(e.touches[0], e.touches[1]);
         canvas.dispatchEvent(new MouseEvent('mousedown', {
           clientX:lastCenter.x, clientY:lastCenter.y,
           button:2, buttons:2, bubbles:true
@@ -60,48 +62,60 @@ var statusElement=document.getElementById("status"),progressElement=document.get
       }
     }, {passive:false});
 
-    canvas.addEventListener('touchmove', function(e){
+    // Handle pan + zoom
+    canvas.addEventListener('touchmove', e => {
       if (!twoFinger || e.touches.length !== 2) return;
       e.preventDefault();
 
-      var c = center(e.touches);
-      // Continue panning (right-drag)
+      const now = performance.now();
+      const c = center(e.touches);
+      const d = distance(e.touches[0], e.touches[1]);
+
+      // Smooth center movement (reduce jitter)
+      const alpha = 0.25; // smoothing factor
+      smoothX = smoothX + alpha * (c.x - smoothX);
+      smoothY = smoothY + alpha * (c.y - smoothY);
+
+      // Pan
       canvas.dispatchEvent(new MouseEvent('mousemove', {
-        clientX:c.x, clientY:c.y, buttons:2, bubbles:true
+        clientX:smoothX, clientY:smoothY, buttons:2, bubbles:true
       }));
 
-      // Pinch => mouse wheel zoom
-      var d  = distance(e.touches[0], e.touches[1]);
-      var dy = (lastDist - d) * 2; // adjust sensitivity as desired
-      if (Math.abs(dy) > 1){
+      // Pinch zoom
+      const scale = d / lastDist;
+      if (Math.abs(scale - 1) > 0.01 && now - lastMoveTime > 10) {
+        const delta = (1 - scale) * 100; // adjust zoom speed
         canvas.dispatchEvent(new WheelEvent('wheel', {
-          deltaY: dy, clientX:c.x, clientY:c.y, bubbles:true
+          deltaY: delta, clientX:smoothX, clientY:smoothY, bubbles:true
         }));
+        lastMoveTime = now;
         lastDist = d;
       }
+
       lastCenter = c;
     }, {passive:false});
 
-    function endPan(){
+    // End pan
+    const endPan = () => {
       if (!twoFinger) return;
       canvas.dispatchEvent(new MouseEvent('mouseup', {
         clientX:lastCenter.x, clientY:lastCenter.y,
         button:2, buttons:0, bubbles:true
       }));
       twoFinger = false;
-    }
-    canvas.addEventListener('touchend',   function(e){ if (e.touches.length < 2) endPan(); }, {passive:false});
+    };
+    canvas.addEventListener('touchend', e => { if (e.touches.length < 2) endPan(); }, {passive:false});
     canvas.addEventListener('touchcancel', endPan, {passive:false});
     return true;
   }
 
-  // Run now; if Module/canvas isn't ready yet, hook into runtime init and window load
+  // Hook after module init
   if (!attach()){
-    var prev = (window.Module && Module.onRuntimeInitialized) || null;
+    const prev = (window.Module && Module.onRuntimeInitialized) || null;
     window.Module = window.Module || {};
     Module.onRuntimeInitialized = function(){ if (prev) prev(); attach(); };
-    window.addEventListener('load', function(){ setTimeout(attach, 0); });
+    window.addEventListener('load', () => setTimeout(attach, 0));
   }
-})();
-</script>
+ })();
+ </script>
 </body></html>
