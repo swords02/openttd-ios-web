@@ -11,7 +11,7 @@ BuildDirectory: /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build
 CostDataFile: 
 
 # Site is something like machine.domain, i.e. pragmatic.crd
-Site: 5b5c6ca99183
+Site: 095979488eea
 
 # Build name is osname-revision-compiler, i.e. Linux-2.4.2-2smp-c++
 BuildName: Emscripten-em++
