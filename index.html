@@ -30,69 +30,57 @@ var statusElement=document.getElementById("status"),progressElement=document.get
     const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
     if (!canvas) return false;
 
-    canvas.style.cursor = 'none';
     canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'none';
 
-    let twoFinger = false;
     let pA = null, pB = null;
-    let target = {x:0, y:0}, current = {x:0, y:0};
-    let moving = false;
+    let lastDist = 0;
 
-    // Smooth animation loop
-    function loop(){
-      if (twoFinger && moving){
-        current.x += (target.x - current.x) * 0.35;
-        current.y += (target.y - current.y) * 0.35;
-        canvas.dispatchEvent(new MouseEvent('mousemove', {
-          clientX: current.x, clientY: current.y, buttons: 2, bubbles: true
-        }));
-      }
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-
-    // Helpers
-    function updateCenter(){
-      target.x = (pA.clientX + pB.clientX) / 2;
-      target.y = (pA.clientY + pB.clientY) / 2;
-      moving = true;
+    function pinchDist(t1, t2){
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     }
 
     canvas.addEventListener('touchstart', e => {
-      if (e.touches.length === 2) {
+      if (e.touches.length === 2){
         e.preventDefault();
-        twoFinger = true;
-        pA = e.touches[0]; pB = e.touches[1];
-        updateCenter();
-        canvas.dispatchEvent(new MouseEvent('mousedown', {
-          clientX: target.x, clientY: target.y,
-          button: 2, buttons: 2, bubbles: true
-        }));
+        pA = e.touches[0];
+        pB = e.touches[1];
+        lastDist = pinchDist(pA, pB);
       }
     }, {passive:false});
 
     canvas.addEventListener('touchmove', e => {
-      if (!twoFinger || e.touches.length !== 2) return;
+      if (e.touches.length !== 2) return;
       e.preventDefault();
-      pA = e.touches[0]; pB = e.touches[1];
-      updateCenter();
-    }, {passive:false});
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const dist = pinchDist(t1, t2);
+      const scale = dist / lastDist;
 
-    function endPan(){
-      if (!twoFinger) return;
-      canvas.dispatchEvent(new MouseEvent('mouseup', {
-        clientX: target.x, clientY: target.y,
-        button: 2, buttons: 0, bubbles: true
-      }));
-      twoFinger = false;
-      moving = false;
-    }
+      // dead-zone filter
+      if (Math.abs(scale - 1) > 0.02) {
+        const cx = (t1.clientX + t2.clientX) / 2;
+        const cy = (t1.clientY + t2.clientY) / 2;
+        const dir = scale > 1 ? -1 : 1;  // wheel negative = zoom-in
+        const steps = Math.max(1, Math.min(5, Math.round(Math.abs(Math.log(scale))*10)));
+        for (let i = 0; i < steps; i++){
+          canvas.dispatchEvent(new WheelEvent('wheel', {
+            deltaY: dir * 120,
+            clientX: cx,
+            clientY: cy,
+            bubbles: true
+          }));
+        }
+        lastDist = dist;
+      }
+    }, {passive:false});
 
     canvas.addEventListener('touchend', e => {
-      if (e.touches.length < 2) endPan();
+      if (e.touches.length < 2){
+        pA = pB = null;
+      }
     }, {passive:false});
 
-    canvas.addEventListener('touchcancel', endPan, {passive:false});
+    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
 
     return true;
   }
