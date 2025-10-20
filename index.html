@@ -26,6 +26,8 @@ var statusElement=document.getElementById("status"),progressElement=document.get
 
 <script>
 (function(){
+  const SENSITIVITY = 0.3; // smaller = slower zoom (try 0.3–0.6)
+
   function attach(){
     const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
     if (!canvas) return false;
@@ -52,32 +54,29 @@ var statusElement=document.getElementById("status"),progressElement=document.get
     canvas.addEventListener('touchmove', e => {
       if (e.touches.length !== 2) return;
       e.preventDefault();
+
       const t1 = e.touches[0], t2 = e.touches[1];
       const dist = pinchDist(t1, t2);
       const scale = dist / lastDist;
 
-      // dead-zone filter
-      if (Math.abs(scale - 1) > 0.02) {
+      if (Math.abs(scale - 1) > 0.01) { // smaller deadzone = more responsive
         const cx = (t1.clientX + t2.clientX) / 2;
         const cy = (t1.clientY + t2.clientY) / 2;
-        const dir = scale > 1 ? -1 : 1;  // wheel negative = zoom-in
-        const steps = Math.max(1, Math.min(5, Math.round(Math.abs(Math.log(scale))*10)));
-        for (let i = 0; i < steps; i++){
-          canvas.dispatchEvent(new WheelEvent('wheel', {
-            deltaY: dir * 120,
-            clientX: cx,
-            clientY: cy,
-            bubbles: true
-          }));
-        }
+
+        // translate scale to wheel motion with sensitivity applied
+        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -delta,  // negative = zoom in
+          clientX: cx,
+          clientY: cy,
+          bubbles: true
+        }));
         lastDist = dist;
       }
     }, {passive:false});
 
     canvas.addEventListener('touchend', e => {
-      if (e.touches.length < 2){
-        pA = pB = null;
-      }
+      if (e.touches.length < 2) pA = pB = null;
     }, {passive:false});
 
     canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
