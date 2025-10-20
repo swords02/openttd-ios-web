@@ -23,99 +23,143 @@ canvas.emscripten{border:0 none;height:100%;position:absolute;width:100%;z-index
 var statusElement=document.getElementById("status"),progressElement=document.getElementById("progress"),spinnerElement=document.getElementById("spinner"),Module={preRun:[],postRun:[],arguments:[],totalDependencies:42,doneDependencies:0,lastDependencies:1,print:function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")),console.log(e)},printErr:function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")),console.error(e)},canvas:function(){var e=document.getElementById("canvas");return e.addEventListener("webglcontextlost",(function(e){alert("WebGL context lost. You will need to reload the page."),e.preventDefault()}),!1),e}(),setStatus:function(e){if("none"!=document.getElementById("canvas").style.display){var n=e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);n&&(e="("+n[2]+" / "+n[4]+") "+n[1]),document.getElementById("message").innerHTML=e}},monitorRunDependencies:function(e){e<Module.lastDependencies&&(Module.doneDependencies+=1),Module.lastDependencies=e,total=Module.totalDependencies,doing=Module.doneDependencies+1,doing>total&&(doing=total),document.getElementById("title").innerHTML="("+doing+" / "+total+") Loading ...",document.getElementById("message").innerHTML="Preparing game ..."},onBootstrap:function(e,n){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Missing base graphics",document.getElementById("message").innerHTML="OpenTTD is downloading base graphics.<br/><br/>"+e+" / "+n+" bytes downloaded."},onBootstrapFailed:function(e,n){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Missing base graphics",document.getElementById("message").innerHTML="Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again."},onBootstrapReload:function(){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Missing base graphics",document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game."},onExit:function(){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Thank you for playing!",document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game."},onAbort:function(){document.getElementById("canvas").style.display="none",document.getElementById("box").className="error",document.getElementById("title").innerHTML="Crash :(",document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game."},onWarningFs:function(){document.getElementById("filesystem").style.display="inline-block",document.getElementById("overlay").style.opacity=1,setTimeout((function(){document.getElementById("overlay").style.opacity=0,setTimeout((function(){document.getElementById("filesystem").style.display="none"}),300)}),1e4)}};window.onerror=function(){Module.onAbort()}
 </script>
 <script async src="openttd.js"></script>
+<!-- Smooth two-finger pan + pinch zoom with fallback -->
+<style>
+  /* small overlay zoom buttons (hidden by default) */
+  .zoom-ui{position:absolute;right:8px;bottom:8px;display:none;gap:6px;z-index:5}
+  .zoom-ui button{font:600 16px/1 system-ui, sans-serif;padding:10px 12px;border-radius:10px;border:0;box-shadow:0 2px 6px rgba(0,0,0,.2);background:#222;color:#fff;opacity:.85}
+  .zoom-ui button:active{transform:scale(.97)}
+</style>
+<div class="zoom-ui" id="zoomUI">
+  <button id="zoomOut">−</button>
+  <button id="zoomIn">+</button>
+</div>
 
-<!-- Gestures: two-finger pan (right-drag) + pinch-to-zoom (wheel) -->
 <script>
 (function(){
+  // ---- helpers
+  function rafLoop(fn){
+    let rID=null; function loop(){ fn(); rID=requestAnimationFrame(loop); }
+    rID=requestAnimationFrame(loop); return ()=>cancelAnimationFrame(rID);
+  }
+  function supportsWheel(){
+    try { new WheelEvent('wheel'); return true; } catch(e){ return false; }
+  }
+
   function attach(){
     const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
     if (!canvas) return false;
 
+    // Prevent browser gestures and hide OS cursor
     canvas.style.cursor = 'none';
     canvas.style.touchAction = 'none';
 
-    let twoFinger = false;
-    let lastCenter = {x:0, y:0};
-    let lastDist = 0;
-    let lastMoveTime = 0;
-    let smoothX = 0, smoothY = 0;
+    const zoomUI = document.getElementById('zoomUI');
+    const btnIn  = document.getElementById('zoomIn');
+    const btnOut = document.getElementById('zoomOut');
 
-    const center = t => ({
-      x: (t[0].clientX + t[1].clientX) / 2,
-      y: (t[0].clientY + t[1].clientY) / 2
-    });
-    const distance = (a,b) => Math.hypot(a.clientX-b.clientX, a.clientY-b.clientY);
-
-    // Start pan/zoom
-    canvas.addEventListener('touchstart', e => {
-      if (e.touches.length === 2) {
-        e.preventDefault();
-        twoFinger = true;
-        lastCenter = center(e.touches);
-        smoothX = lastCenter.x;
-        smoothY = lastCenter.y;
-        lastDist = distance(e.touches[0], e.touches[1]);
-        canvas.dispatchEvent(new MouseEvent('mousedown', {
-          clientX:lastCenter.x, clientY:lastCenter.y,
-          button:2, buttons:2, bubbles:true
-        }));
-      }
-    }, {passive:false});
-
-    // Handle pan + zoom
-    canvas.addEventListener('touchmove', e => {
-      if (!twoFinger || e.touches.length !== 2) return;
-      e.preventDefault();
-
-      const now = performance.now();
-      const c = center(e.touches);
-      const d = distance(e.touches[0], e.touches[1]);
-
-      // Smooth center movement (reduce jitter)
-      const alpha = 0.25; // smoothing factor
-      smoothX = smoothX + alpha * (c.x - smoothX);
-      smoothY = smoothY + alpha * (c.y - smoothY);
-
-      // Pan
-      canvas.dispatchEvent(new MouseEvent('mousemove', {
-        clientX:smoothX, clientY:smoothY, buttons:2, bubbles:true
-      }));
-
-      // Pinch zoom
-      const scale = d / lastDist;
-      if (Math.abs(scale - 1) > 0.01 && now - lastMoveTime > 10) {
-        const delta = (1 - scale) * 100; // adjust zoom speed
+    // Expose simple zoom "actions" we can call from pinch fallback
+    function zoomStep(dir /* +1 or -1 */, x, y){
+      // Try real wheel first (works on many non-iOS browsers)
+      if (wheelUsable){
         canvas.dispatchEvent(new WheelEvent('wheel', {
-          deltaY: delta, clientX:smoothX, clientY:smoothY, bubbles:true
+          deltaY: dir < 0 ? -120 : 120,
+          clientX: x, clientY: y, bubbles: true
         }));
-        lastMoveTime = now;
-        lastDist = d;
+        return true;
       }
+      // Fallback: click on-screen buttons (always allowed)
+      (dir < 0 ? btnIn : btnOut).click();
+      return false;
+    }
 
-      lastCenter = c;
+    // show zoom buttons if needed (mobile fallback)
+    let wheelUsable = supportsWheel();
+    // iOS Safari: even if constructor exists, synthetic wheel is ignored
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    if (isIOS) wheelUsable = false;
+
+    // Hook zoom buttons to emit multiple small steps near pointer center
+    let lastPointer = {x: innerWidth/2, y: innerHeight/2};
+    btnIn.onclick  = ()=>{ for (let i=0;i<2;i++) canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-120,clientX:lastPointer.x,clientY:lastPointer.y,bubbles:true})); };
+    btnOut.onclick = ()=>{ for (let i=0;i<2;i++) canvas.dispatchEvent(new WheelEvent('wheel',{deltaY: 120,clientX:lastPointer.x,clientY:lastPointer.y,bubbles:true})); };
+    if (!wheelUsable) zoomUI.style.display='flex';
+
+    // ---- two-finger pan + pinch
+    let twoFinger=false;
+    let pA=null, pB=null;
+    let lastDist=0;
+    let target={x:0,y:0}, current={x:0,y:0};
+    let moving=false;
+
+    // rate-limited smoother: 60fps mousemove while two-finger down
+    const stopRAF = rafLoop(()=>{
+      if (!twoFinger || !moving) return;
+      // low-pass filter
+      current.x += (target.x - current.x)*0.35;
+      current.y += (target.y - current.y)*0.35;
+      canvas.dispatchEvent(new MouseEvent('mousemove', {clientX:current.x, clientY:current.y, buttons:2, bubbles:true}));
+      // convergence threshold
+      if (Math.hypot(target.x-current.x, target.y-current.y) < 0.5) moving=false;
+    });
+
+    function updateCenter(){
+      const cx=(pA.clientX+pB.clientX)/2, cy=(pA.clientY+pB.clientY)/2;
+      target.x=cx; target.y=cy; lastPointer={x:cx,y:cy}; moving=true;
+    }
+    function pinchScale(){
+      return Math.hypot(pA.clientX-pB.clientX, pA.clientY-pB.clientY);
+    }
+
+    canvas.addEventListener('touchstart', e=>{
+      if (e.touches.length===2){
+        e.preventDefault();
+        twoFinger=true;
+        pA=e.touches[0]; pB=e.touches[1];
+        updateCenter();
+        lastDist=pinchScale();
+        // begin right-drag pan
+        canvas.dispatchEvent(new MouseEvent('mousedown',{clientX:target.x,clientY:target.y,button:2,buttons:2,bubbles:true}));
+      }
     }, {passive:false});
 
-    // End pan
-    const endPan = () => {
+    canvas.addEventListener('touchmove', e=>{
+      if (!twoFinger || e.touches.length!==2) return;
+      e.preventDefault();
+      // update pointers
+      // (copy relevant fields; Touch objects are live but we rebind)
+      pA=e.touches[0]; pB=e.touches[1];
+      updateCenter();
+
+      // pinch -> zoom steps
+      const d=pinchScale();
+      const scale=d/lastDist;
+      if (Math.abs(scale-1)>0.02){  // deadzone
+        const steps = Math.max(1, Math.min(4, Math.round(Math.abs(Math.log(scale))*8)));
+        const dir = (scale>1) ? -1 : +1; // wheel zooms in with negative delta
+        for (let i=0;i<steps;i++) zoomStep(dir, target.x, target.y);
+        lastDist=d;
+      }
+    }, {passive:false});
+
+    function endPan(){
       if (!twoFinger) return;
-      canvas.dispatchEvent(new MouseEvent('mouseup', {
-        clientX:lastCenter.x, clientY:lastCenter.y,
-        button:2, buttons:0, bubbles:true
-      }));
-      twoFinger = false;
-    };
-    canvas.addEventListener('touchend', e => { if (e.touches.length < 2) endPan(); }, {passive:false});
+      canvas.dispatchEvent(new MouseEvent('mouseup',{clientX:target.x,clientY:target.y,button:2,buttons:0,bubbles:true}));
+      twoFinger=false; moving=false;
+    }
+    canvas.addEventListener('touchend', e=>{ if (e.touches.length<2) endPan(); }, {passive:false});
     canvas.addEventListener('touchcancel', endPan, {passive:false});
+
     return true;
   }
 
-  // Hook after module init
   if (!attach()){
     const prev = (window.Module && Module.onRuntimeInitialized) || null;
     window.Module = window.Module || {};
     Module.onRuntimeInitialized = function(){ if (prev) prev(); attach(); };
-    window.addEventListener('load', () => setTimeout(attach, 0));
+    window.addEventListener('load', ()=> setTimeout(attach,0));
   }
- })();
- </script>
+})();
+</script>
+
 </body></html>
