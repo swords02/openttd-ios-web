@@ -1,4 +1,5 @@
 Join the open test: https://testflight.apple.com/join/sMZ7a4bm
+
 How to play: https://wiki.openttd.org/en/Manual/Tutorial/
 
 Disclaimer: This is an unofficial fan-made port of the open-source project OpenTTD.
