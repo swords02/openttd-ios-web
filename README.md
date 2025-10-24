@@ -25,4 +25,5 @@ This game is open-source; you can view and download the source files at https://
 - Chris Sawyer / MicroProse — Creators of the original Transport Tycoon Deluxe
 - This port — Developed by Owen Gerke
 
+Play OpenTTD in your browser: https://openttd.owengerke.cc/
 Visit the official OpenTTD Website: https://www.openttd.org/
