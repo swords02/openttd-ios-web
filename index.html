@@ -5,7 +5,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title>OpenTTD</title>
 
-<!-- CSP tuned for Emscripten + inline setup, and ALLOW Cloudflare Analytics. -->
+<!-- CSP: allows CF Analytics; suitable for Emscripten runtime and inline bootstrapping -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
@@ -34,7 +34,8 @@
   #title{color:#fcfcfc;height:20px;text-shadow:1px 1px #101010}
   #message{color:#101010;padding:4px 4px}
   canvas.emscripten{border:0 none;height:100%;position:absolute;width:100%;z-index:2;cursor:none!important;touch-action:none}
-  :root { --ttd-toolbar-h: 48px; }
+
+  :root{--ttd-toolbar-h:48px}
   .ttd-toggle{position:fixed;top:8px;left:8px;z-index:9999;background:#111;color:#eee;border:1px solid #3a3a3a;border-radius:999px;padding:6px 10px;font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;opacity:.9}
   .ttd-toggle:hover{opacity:1}
   .ttd-toolbar{position:fixed;top:0;left:0;right:0;height:var(--ttd-toolbar-h);display:none;gap:8px;align-items:center;padding:8px 12px;background:#111;color:#eee;z-index:9998;border-bottom:1px solid #333;box-shadow:0 2px 10px rgba(0,0,0,.35)}
@@ -75,10 +76,7 @@
 
 <script>
 /* Ensure Module exists early so openttd.js can attach safely */
-var Module = window.Module || {
-  preRun:[], postRun:[], arguments:[],
-  totalDependencies:42, doneDependencies:0, lastDependencies:1
-};
+var Module = window.Module || { preRun:[], postRun:[], arguments:[], totalDependencies:42, doneDependencies:0, lastDependencies:1 };
 Module.print = function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")); console.log(e);};
 Module.printErr = function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")); console.error(e);};
 Module.canvas = (function(){var e=document.getElementById("canvas"); e.addEventListener("webglcontextlost",function(t){alert("WebGL context lost. You will need to reload the page."); t.preventDefault();},!1); return e;})();
@@ -89,13 +87,13 @@ Module.onBootstrapFailed = function(){ document.getElementById("canvas").style.d
 Module.onBootstrapReload = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("title").innerHTML="Missing base graphics"; document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game."; };
 Module.onExit = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("title").innerHTML="Thank you for playing!"; document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game."; };
 Module.onAbort = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("box").className="error"; document.getElementById("title").innerHTML="Crash :("; document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game."; };
-Module.onWarningFs = function(){ document.getElementById("filesystem").style.display="inline-block"; document.getElementById("overlay").style.opacity=1; setTimeout(function(){ document.getElementById("overlay").style.opacity=0; setTimeout(function(){ document.getElementById("filesystem").style.display="none"; },300); },10000); };
+Module.onWarningFs = function(){ document.getElementById("filesystem").style.display="inline-block"; document.getElementById("overlay").style.opacity=1; setTimeout(function(){ document.getElementById("overlay").style.opacity=0; setTimeout(function(){ document.getElementById("filesystem").style.display="none"); },300); },10000); };
 window.onerror=function(){ Module.onAbort(); };
 /* Keep file paths relative */
 Module.locateFile = function (p) { return p; };
 </script>
 
-<!-- Load game runtime -->
+<!-- Game runtime -->
 <script src="openttd.js" crossorigin="anonymous"></script>
 
 <!-- Touch pinch-to-zoom helper -->
@@ -128,7 +126,7 @@ Module.locateFile = function (p) { return p; };
 })();
 </script>
 
-<!-- Toolbar logic: persists to real personal dir -->
+<!-- Toolbar, IDBFS mounting and save import/export -->
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -143,8 +141,8 @@ Module.locateFile = function (p) { return p; };
   importBtn.disabled = true; exportBtn.disabled = true;
   const setStatus = (m) => statusEl.textContent = m;
 
-  const getFS    = () => (window.Module && Module.FS)    ? Module.FS    : (typeof FS !== 'undefined' ? FS    : null);
-  const getENV   = () => (window.Module && Module.ENV)   ? Module.ENV   : (typeof ENV !== 'undefined' ? ENV   : {});
+  const getFS = () => (window.Module && Module.FS) ? Module.FS : (typeof FS !== 'undefined' ? FS : null);
+  const getIDB = () => (window.Module && Module.IDBFS) ? Module.IDBFS : (typeof IDBFS !== 'undefined' ? IDBFS : null);
   const getCanvas = () => document.getElementById('canvas') || document.querySelector('canvas');
 
   const applyCanvasOffset = () => { const c=getCanvas(); if(!c) return; c.style.marginTop = bar.classList.contains('open') ? 'var(--ttd-toolbar-h)' : '0px'; };
@@ -152,49 +150,58 @@ Module.locateFile = function (p) { return p; };
   applyCanvasOffset(); window.addEventListener('resize', applyCanvasOffset);
 
   const pathExists = (FS, p) => { try { FS.lookupPath(p); return true; } catch { return false; } };
-  const safeStat   = (FS, p) => { try { return FS.stat(p); } catch { return null; } };
+  const isDir = (FS, p) => { try { return (FS.stat(p).mode & 0x4000) === 0x4000; } catch { return false; } };
+  const safeStat = (FS, p) => { try { return FS.stat(p); } catch { return null; } };
   const mkdirp = (FS, p) => { const parts=p.split('/').filter(Boolean); let cur=''; for(const part of parts){ cur+='/'+part; try{ FS.mkdir(cur); }catch{} } };
 
-  let _syncBusy=false,_queue=false;
+  // Sync queue that only runs if IDBFS is mounted at /.openttd
+  let _syncBusy=false,_queue=false,_mounted=false;
+  const hasMount = (FS) => {
+    try { const node = FS.lookupPath('/.openttd').node; return !!(node && node.mounted && node.mounted.type && node.mounted.type.mount); }
+    catch { return false; }
+  };
   const syncfs = () => new Promise((res,rej)=>{
-    const FS=getFS(); if(!FS){ res(); return; }
+    const FS=getFS(); if(!FS || !_mounted || !hasMount(FS)){ res(); return; }
     const run=()=>{ _syncBusy=true; FS.syncfs(false,(err)=>{ _syncBusy=false; if(_queue){ _queue=false; setTimeout(()=>syncfs().then(res,rej),60);} err?rej(err):res(); }); };
     if(_syncBusy){ _queue=true; setTimeout(()=>syncfs().then(res,rej),120); } else run();
   });
 
-  function detectPersonalDir(FS) {
-    const ENV = getENV();
-    const home = ENV?.HOME || '/home/web_user';
-    const candidates = [
-      home + '/.openttd',
-      '/home/web_user/.openttd',
-      '/root/.openttd',
-      '/home/.openttd',
-      '/.openttd'
-    ];
-    for (const p of candidates){ if (pathExists(FS, p)) return p; }
-    return home + '/.openttd';
-  }
-
-  let PERSONAL=null, SAVE_DIR=null;
-  function ensurePersonal(FS){
-    PERSONAL = detectPersonalDir(FS);
-    SAVE_DIR = PERSONAL + '/save';
-    mkdirp(FS, SAVE_DIR);
-    try { if (!pathExists(FS, '/.openttd')) FS.symlink(PERSONAL, '/.openttd'); } catch {}
+  // Ensure /.openttd is a directory, mount IDBFS there, and create /save
+  async function ensureStorageMounted() {
+    const FS=getFS(), IDB=getIDB();
+    if (!FS) return false;
+    try {
+      if (pathExists(FS, '/.openttd') && !isDir(FS, '/.openttd')) {
+        // It’s a file/symlink → remove and recreate as directory
+        try { FS.unlink('/.openttd'); } catch {}
+      }
+      if (!pathExists(FS, '/.openttd')) {
+        FS.mkdir('/.openttd');
+      }
+      if (IDB && !hasMount(FS)) {
+        FS.mount(IDB, {}, '/.openttd');
+        await new Promise((ok,err)=>FS.syncfs(true, (e)=> e?err(e):ok()));
+      }
+      _mounted = hasMount(FS);
+      mkdirp(FS, '/.openttd/save');
+      return true;
+    } catch (e) {
+      console.error('ensureStorageMounted failed', e);
+      return false;
+    }
   }
 
   const listSaves = (FS) => {
     try {
-      const items = FS.readdir(SAVE_DIR).filter(f=>f!=='.'&&f!=='..'&&f.toLowerCase().endsWith('.sav'));
-      items.sort((a,b)=> (safeStat(FS,SAVE_DIR+'/'+b)?.mtime||0) - (safeStat(FS,SAVE_DIR+'/'+a)?.mtime||0));
+      const items = FS.readdir('/.openttd/save').filter(f=>f!=='.'&&f!=='..'&&f.toLowerCase().endsWith('.sav'));
+      items.sort((a,b)=> (safeStat(FS,'/.openttd/save/'+b)?.mtime||0) - (safeStat(FS,'/.openttd/save/'+a)?.mtime||0));
       return items;
     } catch { return []; }
   };
 
   const refreshList = () => {
     const FS=getFS(); saveList.innerHTML='';
-    if (!FS || !PERSONAL || !SAVE_DIR) {
+    if (!FS || !_mounted) {
       const opt=document.createElement('option'); opt.value=''; opt.textContent='(storage not ready)'; saveList.appendChild(opt); return;
     }
     const items=listSaves(FS);
@@ -202,48 +209,48 @@ Module.locateFile = function (p) { return p; };
     for(const f of items){ const opt=document.createElement('option'); opt.value=f; opt.textContent=f; saveList.appendChild(opt); }
   };
 
-  importBtn.addEventListener('click', async () => {
+  $('ttd-import-btn').addEventListener('click', async () => {
     const FS=getFS(); if(!FS){ setStatus('FS not ready'); return; }
     const file=fileInput.files && fileInput.files[0]; if(!file){ setStatus('Choose a file to import'); return; }
     try{
-      ensurePersonal(FS);
       setStatus('Importing '+file.name+' …');
+      await ensureStorageMounted();
       const buf=await file.arrayBuffer();
-      FS.writeFile(SAVE_DIR+'/'+file.name, new Uint8Array(buf));
+      FS.writeFile('/.openttd/save/'+file.name, new Uint8Array(buf));
       await syncfs();
-      setStatus('Imported to '+SAVE_DIR+'/'+file.name);
+      setStatus('Imported to /.openttd/save/'+file.name);
       refreshList();
-    }catch(e){ console.error(e); setStatus('Import failed: '+e.message); }
+    }catch(e){ console.error(e); setStatus('Import failed: '+(e && e.message || e)); }
   });
 
-  exportBtn.addEventListener('click', () => {
+  $('ttd-export-btn').addEventListener('click', () => {
     const FS=getFS(); if(!FS){ setStatus('FS not ready'); return; }
     const filename=saveList.value; if(!filename){ setStatus('No save selected'); return; }
     try{
-      const data=FS.readFile(SAVE_DIR+'/'+filename);
+      const data=FS.readFile('/.openttd/save/'+filename);
       const blob=new Blob([data],{type:'application/octet-stream'});
       const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click();
       setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);
       setStatus('Exported '+filename);
-    }catch(e){ console.error(e); setStatus('Export failed: '+e.message); }
+    }catch(e){ console.error(e); setStatus('Export failed: '+(e && e.message || e)); }
   });
 
   function fsReady(){ const FS=getFS(); return !!(FS && FS.root); }
 
   async function initIfReady(){
     if (!fsReady()) return false;
-    try{
-      const FS=getFS(); ensurePersonal(FS);
+    const ok = await ensureStorageMounted();
+    if (ok) {
       refreshList();
-      setStatus('Ready ('+(SAVE_DIR||'/.openttd/save')+')');
+      setStatus('Ready (/.openttd/save)');
       importBtn.disabled=false; exportBtn.disabled=false;
-    }catch(e){ console.error(e); setStatus('Storage init failed'); }
-    return true;
+    }
+    return ok;
   }
 
   (Module.postRun = Module.postRun || []).push(() => { initIfReady(); });
   let tries=0;
-  const t=setInterval(async()=>{ if(await initIfReady() || ++tries>400) clearInterval(t); if(PERSONAL) refreshList(); },150);
+  const t=setInterval(async()=>{ if(await initIfReady() || ++tries>400) clearInterval(t); if(_mounted) refreshList(); },150);
 })();
 </script>
 
