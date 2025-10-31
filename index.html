@@ -4,16 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD Online</title>
-<meta name="description" content="Play OpenTTD online directly in your browser — build transport empires, connect cities, and manage industries in this classic open-source tycoon game!">
-<meta name="keywords" content="OpenTTD online, OpenTTD web, play OpenTTD browser, transport tycoon online, webassembly openttd, open transport tycoon deluxe">
+<meta name="description" content="Play OpenTTD online in your browser. Build and manage your transport empire—no downloads required.">
+<meta name="keywords" content="OpenTTD online, play OpenTTD in browser, transport tycoon web, OpenTTD WebAssembly">
 
-<!-- CSP (connect-src includes the OpenTTD endpoints & WSS). If you want to be future-proof, you can replace connect-src with: connect-src 'self' https: wss:; -->
+<!-- CSP: allow OpenTTD endpoints (HTTP/S + WSS). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';
         script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';
-        script-src-attr 'self' 'unsafe-inline';
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
         font-src 'self' data:;
@@ -34,16 +33,16 @@
 <link rel="icon" type="image/png" href="favicon.png">
 
 <style>
-  html,body { margin:0; padding:0; height:100%; width:100%; background:#1a1a1a; overflow:hidden; }
-  #canvas { width:100%; height:100%; display:block; background:#1a1a1a; cursor:none; z-index:1; position:relative; }
-  #overlay { position:fixed; inset:0; display:flex; justify-content:center; align-items:center; transition:opacity .25s ease; pointer-events:none; z-index:2; }
-  #box { text-align:center; color:#eee; font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width:720px; }
-  #box h2 { margin:.2rem 0 .4rem; font-weight:600; font-size:18px; color:#fff; }
-  #toolbar { position:fixed; top:10px; left:10px; z-index:3; background:rgba(0,0,0,0.55); border:1px solid #333; border-radius:8px; padding:6px 10px; backdrop-filter: blur(2px); }
-  #toolbar button { color:#eee; background:#222; border:1px solid #444; border-radius:6px; padding:6px 10px; margin:0 4px 0 0; cursor:pointer; }
-  #toolbar button:hover { background:#2b2b2b; }
-  #filesystem { display:none; position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.6); padding:8px 10px; border-radius:8px; color:#fff; font-size:13px; border:1px solid #333; z-index:3; }
-  .error { color:#ff6b6b; }
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
+  #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
+  #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .25s;pointer-events:none;z-index:2}
+  #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
+  #toolbar{position:fixed;top:10px;left:10px;z-index:3;background:rgba(0,0,0,.55);border:1px solid #333;border-radius:8px;padding:6px 10px;backdrop-filter:blur(2px)}
+  #toolbar button{color:#eee;background:#222;border:1px solid #444;border-radius:6px;padding:6px 10px;margin:0 4px 0 0;cursor:pointer}
+  #toolbar button:hover{background:#2b2b2b}
+  #filesystem{display:none;position:fixed;bottom:10px;right:10px;background:rgba(0,0,0,.6);padding:8px 10px;border-radius:8px;color:#fff;font-size:13px;border:1px solid #333;z-index:3}
+  .error{color:#ff6b6b}
 </style>
 </head>
 
@@ -51,6 +50,8 @@
   <div id="toolbar">
     <button type="button" onclick="exportSave()">Export Save</button>
     <button type="button" onclick="importSave()">Import Save</button>
+    <button type="button" onclick="exportScenario()">Export Scenario</button>
+    <button type="button" onclick="importScenario()">Import Scenario</button>
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -64,29 +65,27 @@
 
   <div id="filesystem">Saving files…</div>
 
-  <!-- Module bootstrap (must be BEFORE openttd.js) -->
+  <!-- Module bootstrap (BEFORE openttd.js) -->
   <script>
-    /* ----- constants ----- */
     const SAVE_DIR = '/home/web_user/.openttd/save/';
+    const SCEN_DIR = '/home/web_user/.openttd/scenario/';
 
-    /* ----- helpers to show/hide overlay ----- */
-    function showGameUI() {
-      const ov = document.getElementById('overlay');
-      ov.style.opacity = 0;
-      // fully remove so it never intercepts input
-      setTimeout(() => { ov.style.display = 'none'; }, 250);
-      document.getElementById('canvas').style.display = 'block';
+    function showGameUI(){ const ov=document.getElementById('overlay'); ov.style.opacity=0; setTimeout(()=>{ov.style.display='none';},250); document.getElementById('canvas').style.display='block'; }
+    function showOverlay(title,msg){ const ov=document.getElementById('overlay'); ov.style.display='flex'; ov.style.opacity=1; if(title)document.getElementById('title').textContent=title; if(msg)document.getElementById('message').innerHTML=msg; }
+
+    function mkdirp(path){
+      const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
+      let cur=''; for(const p of parts){ cur += '/' + p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
+    }
+    function newestByMtime(dir, ext){
+      try{
+        const items = FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'&&f.toLowerCase().endsWith(ext));
+        if(!items.length) return null;
+        let best=items[0], t=0; for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
+        return best;
+      }catch(_){ return null; }
     }
 
-    function showOverlay(title, msg) {
-      const ov = document.getElementById('overlay');
-      ov.style.display = 'flex';
-      ov.style.opacity = 1;
-      if (title) document.getElementById('title').textContent = title;
-      if (msg) document.getElementById('message').innerHTML = msg;
-    }
-
-    /* ----- Emscripten Module ----- */
     var Module = window.Module || {};
     Module.preRun  = Module.preRun  || [];
     Module.postRun = Module.postRun || [];
@@ -95,25 +94,20 @@
     Module.doneDependencies  = Module.doneDependencies  || 0;
     Module.lastDependencies  = Module.lastDependencies  || 1;
 
-    Module.print = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.log(e); };
-    Module.printErr = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.error(e); };
+    Module.print = function(){ console.log([].slice.call(arguments).join(' ')); };
+    Module.printErr = function(){ console.error([].slice.call(arguments).join(' ')); };
 
     Module.canvas = (function(){
       var e=document.getElementById("canvas");
-      e.addEventListener("webglcontextlost",function(t){
-        alert("WebGL context lost. You will need to reload the page.");
-        t.preventDefault();
-      },false);
+      e.addEventListener("webglcontextlost",function(t){ alert("WebGL context lost. Reload the page."); t.preventDefault(); },false);
       return e;
     })();
 
     Module.setStatus = function(e){
-      // keep the text updated while loading
       var n=e && e.match && e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
       if(n) e="("+n[2]+" / "+n[4]+") "+n[1];
       document.getElementById("message").innerHTML = e || '';
-      // if the port reports done via this channel, hide overlay
-      if (e === 'Running...') showGameUI();
+      if(e==='Running...') showGameUI();
     };
 
     Module.monitorRunDependencies = function(e){
@@ -121,113 +115,99 @@
       Module.lastDependencies=e;
       var total=Module.totalDependencies, doing=Module.doneDependencies+1;
       if(doing>total) doing=total;
-      document.getElementById("title").textContent = "(" + doing + " / " + total + ") Loading ...";
-      document.getElementById("message").textContent = "Preparing game ...";
+      document.getElementById("title").textContent="("+doing+" / "+total+") Loading ...";
+      document.getElementById("message").textContent="Preparing game ...";
     };
 
-    // Called by the OpenTTD port when it starts/finishes bootstrap downloads
-    Module.onBootstrap = function(bytes, total){
+    Module.onBootstrap = function(bytes,total){
       document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics",
-                  "OpenTTD is downloading base graphics.<br/><br/>" + bytes + " / " + total + " bytes downloaded.");
+      showOverlay("Missing base graphics","OpenTTD is downloading base graphics.<br/><br/>"+bytes+" / "+total+" bytes downloaded.");
     };
     Module.onBootstrapFailed = function(){
       document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics",
-                  "Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again.");
+      showOverlay("Missing base graphics","Failed to download base graphics.<br/>The game cannot start without them.<br/><br/>Check your connection and console log. Reload to try again.");
     };
     Module.onBootstrapReload = function(){
       document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics", "Downloading base graphics done.<br/><br/>Your browser will reload to start the game.");
+      showOverlay("Missing base graphics","Downloading complete.<br/><br/>Your browser will reload to start the game.");
     };
-
     Module.onExit = function(){
       document.getElementById("canvas").style.display="none";
-      const box = document.getElementById("box");
-      box.classList.remove('error');
-      showOverlay("Thank you for playing!", "Reload your browser to restart the game.");
+      document.getElementById("box").classList.remove('error');
+      showOverlay("Thank you for playing!","Reload your browser to restart the game.");
     };
     Module.onAbort = function(){
       document.getElementById("canvas").style.display="none";
       document.getElementById("box").className="error";
-      showOverlay("Crash :(", "The game crashed!<br/><br/>Please reload your browser to restart the game.");
+      showOverlay("Crash :(","The game crashed!<br/><br/>Reload your browser to restart the game.");
     };
 
-    // When the runtime is ready, hide the overlay for good.
-    Module.onRuntimeInitialized = function() {
-      showGameUI();
-    };
+    /* The port calls this during IDBFS sync warnings (quota, slow write, etc).
+       Define BOTH dot and bracket properties so minified code always finds it. */
+    function _onWarningFsImpl(){
+      const fsEl=document.getElementById('filesystem');
+      fsEl.style.display='inline-block';
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=1;
+      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>{ fsEl.style.display='none'; },300); }, 3000);
+    }
+    Module.onWarningFs = _onWarningFsImpl;
+    Module['onWarningFs'] = _onWarningFsImpl;
+
+    Module.onRuntimeInitialized = function(){ showGameUI(); };
     Module.postRun.push(showGameUI);
 
-    // Keep generated files relative to this page
     Module.locateFile = function (p) { return p; };
-
-    // Safety net
     window.onerror=function(){ Module.onAbort(); };
-  </script>
 
-  <!-- Import / Export using the OpenTTD save directory -->
-  <script>
-    function ensureDir(path) {
-      // create recursively (Emscripten doesn't have mkdirp built-in)
-      const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
-      let cur = '';
-      for (const part of parts) {
-        cur += '/' + part;
-        try { FS.mkdir(cur); } catch(e) { /* exists */ }
-      }
+    /* ---- Import/Export UI ---- */
+    async function exportSave(){
+      try{
+        const name = newestByMtime(SAVE_DIR, '.sav');
+        if(!name){ alert('No .sav files found in '+SAVE_DIR); return; }
+        const data = FS.readFile(SAVE_DIR+name);
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([data],{type:'application/octet-stream'}));
+        a.download=name; a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href),100);
+      }catch(e){ alert('Export failed: '+e.message); }
     }
-
-    function listSavFiles() {
-      try {
-        return FS.readdir(SAVE_DIR)
-                 .filter(f => f !== '.' && f !== '..' && f.toLowerCase().endsWith('.sav'));
-      } catch (e) {
-        return [];
-      }
+    async function importSave(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.sav';
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f) return;
+        const buf=await f.arrayBuffer();
+        try{
+          mkdirp(SAVE_DIR);
+          FS.writeFile(SAVE_DIR+f.name,new Uint8Array(buf));
+          if(Module.FS && Module.FS.syncfs){ Module.FS.syncfs(false,()=>{}); }
+          alert('Imported to '+SAVE_DIR+f.name+'\nOpen “Load Game” to pick it.');
+        }catch(err){ alert('Import failed: '+err.message); }
+      };
+      input.click();
     }
-
-    async function exportSave() {
-      try {
-        const files = listSavFiles();
-        if (files.length === 0) { alert('No .sav files found in ' + SAVE_DIR); return; }
-        // pick newest by mtime
-        let newest = files[0], newestTime = 0;
-        for (const f of files) {
-          const st = FS.stat(SAVE_DIR + f);
-          if (st && st.mtime > newestTime) { newest = f; newestTime = st.mtime; }
-        }
-        const data = FS.readFile(SAVE_DIR + newest);
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
-        a.download = newest;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
-      } catch (e) {
-        alert('Export failed: ' + e.message);
-      }
+    async function exportScenario(){
+      try{
+        const name = newestByMtime(SCEN_DIR, '.scn');
+        if(!name){ alert('No .scn files found in '+SCEN_DIR); return; }
+        const data = FS.readFile(SCEN_DIR+name);
+        const a=document.createElement('a');
+        a.href=URL.createObjectURL(new Blob([data],{type:'application/octet-stream'}));
+        a.download=name; a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href),100);
+      }catch(e){ alert('Export failed: '+e.message); }
     }
-
-    async function importSave() {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.sav,.scn';
-      input.onchange = async (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (!file) return;
-        const buf = await file.arrayBuffer();
-        try {
-          ensureDir(SAVE_DIR);
-          FS.writeFile(SAVE_DIR + file.name, new Uint8Array(buf));
-          // If the port has IDBFS mounted, persist
-          if (Module.FS && Module.FS.syncfs) {
-            Module.FS.syncfs(false, () => {});
-          }
-          alert('Imported to ' + SAVE_DIR + file.name + '\nOpen “Load Game” and select it.');
-        } catch (err) {
-          alert('Import failed: ' + err.message);
-        }
+    async function importScenario(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.scn';
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f) return;
+        const buf=await f.arrayBuffer();
+        try{
+          mkdirp(SCEN_DIR);
+          FS.writeFile(SCEN_DIR+f.name,new Uint8Array(buf));
+          if(Module.FS && Module.FS.syncfs){ Module.FS.syncfs(false,()=>{}); }
+          alert('Imported scenario to '+SCEN_DIR+f.name+'\nOpen “Play Scenario” inside OpenTTD.');
+        }catch(err){ alert('Import failed: '+err.message); }
       };
       input.click();
     }
