@@ -2,16 +2,28 @@
 <html lang="en-us">
 <head>
 <meta charset="utf-8">
-<meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <title>OpenTTD</title>
 
-<!-- CSP to allow base graphics + server lists -->
+<!--
+CSP tuned for Emscripten + inline setup.
+If you disable Cloudflare Analytics, you can remove static.cloudflareinsights.com below.
+-->
 <meta http-equiv="Content-Security-Policy"
-      content="default-src 'self';
-               script-src 'self';
-               img-src 'self' data:;
-               style-src 'self' 'unsafe-inline';
-               connect-src 'self' https://cdn.openttd.org https://servers.openttd.org https://bananas.openttd.org;">
+      content="
+        default-src 'self' data: blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com;
+        script-src-elem 'self' https://static.cloudflareinsights.com;
+        worker-src 'self' blob:;
+        connect-src 'self' https://cdn.openttd.org https://servers.openttd.org https://bananas.openttd.org;
+        img-src 'self' data: blob:;
+        style-src 'self' 'unsafe-inline';
+        object-src 'none';
+        base-uri 'self';
+        frame-ancestors 'self';
+        upgrade-insecure-requests;
+        require-trusted-types-for 'script';
+      ">
 
 <style>
   body{font-family:Tahoma,Arial,Helvetica,sans-serif;font-size:14px;margin:0;padding:0}
@@ -69,7 +81,7 @@
 <div id="overlay" class="overlay"><div id="filesystem">Warning: savegames are stored in the Indexed DB of your browser.<br>Your browser can delete savegames without notice!</div></div>
 <div><canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas></div>
 
-<!-- OpenTTD's Module with status hooks -->
+<!-- OpenTTD Module with status hooks -->
 <script>
 var Module={preRun:[],postRun:[],arguments:[],totalDependencies:42,doneDependencies:0,lastDependencies:1,
 print:function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")),console.log(e)},
@@ -89,9 +101,7 @@ window.onerror=function(){Module.onAbort()}
 <!-- Loader helper: ensure correct paths, and surface loader messages -->
 <script>
   window.Module = window.Module || {};
-  // Keep file lookups relative to current folder (wasm, data, worker)
-  Module.locateFile = function (p) { return p; };
-  // Verbose status in console to diagnose stalls
+  Module.locateFile = function (p) { return p; };   // keep sibling paths
   (function(){
     const oldSetStatus = Module.setStatus || function(){};
     Module.setStatus = (msg)=>{ console.log('[status]', msg); oldSetStatus(msg); };
@@ -101,7 +111,7 @@ window.onerror=function(){Module.onAbort()}
 </script>
 
 <!-- Load WITHOUT async so init order is deterministic -->
-<script src="openttd.js"></script>
+<script src="openttd.js" crossorigin="anonymous"></script>
 
 <!-- Pinch-to-zoom on touch -->
 <script>
@@ -153,7 +163,6 @@ window.onerror=function(){Module.onAbort()}
   const getENV   = () => (window.Module && Module.ENV)   ? Module.ENV   : (typeof ENV !== 'undefined' ? ENV   : {});
   const getCanvas = () => document.getElementById('canvas') || document.querySelector('canvas');
 
-  // UI: collapse/expand and push canvas down when open
   const applyCanvasOffset = () => { const c=getCanvas(); if(!c) return; c.style.marginTop = bar.classList.contains('open') ? 'var(--ttd-toolbar-h)' : '0px'; };
   toggleBtn.addEventListener('click', () => { const open=!bar.classList.contains('open'); bar.classList.toggle('open',open); bar.setAttribute('aria-hidden',String(!open)); applyCanvasOffset(); });
   applyCanvasOffset(); window.addEventListener('resize', applyCanvasOffset);
