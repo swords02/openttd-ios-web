@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD Online</title>
 <meta name="description" content="Play OpenTTD Online instantly in your web browser — no downloads required. Experience the full open-source transport tycoon simulator with trains, planes, ships, and road vehicles, all playable directly online. Build your transport empire anywhere, anytime.">
-
 <meta name="keywords" content="OpenTTD online, play OpenTTD in browser, OpenTTD web version, OpenTTD WebAssembly, Transport Tycoon online, open source transport game, transport tycoon browser, online simulation game, web transport tycoon, OpenTTD for Chrome, OpenTTD Web Build">
-
 <meta name="author" content="overgrown-games.com">
 <meta property="og:title" content="OpenTTD Online – Play in Your Browser">
 <meta property="og:description" content="Play the full OpenTTD transport tycoon simulator directly in your web browser. Build, manage, and expand your transport empire online.">
@@ -44,6 +42,7 @@
   #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
   #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
+
   /* Toolbar sits below the toggle button (54px) so they don't overlap */
   #toolbar{
     position:fixed;top:54px;left:10px;z-index:3;
@@ -57,14 +56,20 @@
   }
   #toolbar button:hover{background:#2b2b2b}
 
+  /* Toolbar buttons always use system cursor for usability */
+  #toolbar, #toolbar * { cursor: pointer !important; }
+
   /* On-screen toggle button (always available, tiny footprint) */
   #toolbar-toggle{
     position:fixed;top:10px;left:10px;z-index:4;
     width:38px;height:38px;border-radius:9999px;
     display:flex;align-items:center;justify-content:center;
     background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
-    cursor:pointer;user-select:none;backdrop-filter:blur(2px)
+    cursor:pointer;user-select:none;backdrop-filter:blur(2px);
+    opacity:0;animation:fadeIn 0.4s ease forwards 0.3s;
   }
+  @keyframes fadeIn { to { opacity:1; } }
+
   #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
   #toolbar-toggle .icon{font-size:18px;line-height:1}
   #toolbar-toggle[aria-pressed="true"]{outline:2px solid #4caf50;outline-offset:1px}
@@ -82,8 +87,9 @@
     max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease
   }
 
+  /* Hide system cursor globally (except toolbar) */
   html, body, canvas, #canvas, * {
-  cursor: none !important;
+    cursor: none !important;
   }
 </style>
 </head>
@@ -218,7 +224,7 @@
       showOverlay("Crash :(","The game crashed! Reload to restart.");
     };
 
-    // FS warning hook (define both, to support bracket/dot access after minification)
+    // FS warning hook
     const _onWarningFsImpl=()=>{
       const fsEl=document.getElementById('filesystem');
       fsEl.style.display='inline-block';
