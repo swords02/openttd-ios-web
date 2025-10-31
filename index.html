@@ -1,11 +1,13 @@
-<!doctype html>
-<html lang="en-us">
+<!DOCTYPE html>
+<html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title>OpenTTD</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenTTD Online</title>
+<meta name="description" content="Play OpenTTD online directly in your browser — build transport empires, connect cities, and manage industries in this classic open-source tycoon game!">
+<meta name="keywords" content="OpenTTD online, OpenTTD web, play OpenTTD browser, transport tycoon online, webassembly openttd, open transport tycoon deluxe">
 
-<!-- CSP: allows CF Analytics; suitable for Emscripten runtime and inline bootstrapping -->
+<!-- CSP that allows analytics + Emscripten -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
@@ -22,237 +24,136 @@
       ">
 
 <style>
-  body{font-family:Tahoma,Arial,Helvetica,sans-serif;font-size:14px;margin:0;padding:0}
-  div.background{background-image:url("data:image/png;base64,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");border:0 none;display:flex;height:100%;position:absolute;width:100%;z-index:1}
-  div.overlay{height:40px;margin:0 auto;opacity:0;pointer-events:none;position:absolute;text-align:center;transition:opacity .3s;width:100%;z-index:3}
-  div.overlay>div{pointer-events:none}
-  div.background>div,div.overlay>div{margin:auto}
-  #filesystem{background-color:#e00000;border:1px solid #fc6458;color:#fcf880;display:none;outline:#a00000;padding:0 4px;width:600px}
-  #message,#title{background-color:#838383;border:1px solid #a8a8a8;outline:1px solid #626262;padding:0 4px;min-width:260px}
-  #box.error #message,#box.error #title{background-color:#e00000;border:1px solid #fc6458;outline:#a00000}
-  #box.error #message{color:#fcf880}
-  #title{color:#fcfcfc;height:20px;text-shadow:1px 1px #101010}
-  #message{color:#101010;padding:4px 4px}
-  canvas.emscripten{border:0 none;height:100%;position:absolute;width:100%;z-index:2;cursor:none!important;touch-action:none}
-
-  :root{--ttd-toolbar-h:48px}
-  .ttd-toggle{position:fixed;top:8px;left:8px;z-index:9999;background:#111;color:#eee;border:1px solid #3a3a3a;border-radius:999px;padding:6px 10px;font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;opacity:.9}
-  .ttd-toggle:hover{opacity:1}
-  .ttd-toolbar{position:fixed;top:0;left:0;right:0;height:var(--ttd-toolbar-h);display:none;gap:8px;align-items:center;padding:8px 12px;background:#111;color:#eee;z-index:9998;border-bottom:1px solid #333;box-shadow:0 2px 10px rgba(0,0,0,.35)}
-  .ttd-toolbar.open{display:flex}
-  .ttd-toolbar input[type="file"]{color:#ccc;max-width:280px}
-  .ttd-toolbar button,.ttd-toolbar select{background:#222;color:#eee;border:1px solid #444;border-radius:6px;padding:6px 10px;cursor:pointer}
-  .ttd-toolbar button:hover,.ttd-toolbar select:hover{background:#2d2d2d}
-  .ttd-toolbar:not(.open){pointer-events:none}
-  .ttd-toolbar.open{pointer-events:auto}
-  .ttd-status{margin-left:auto;opacity:.85;font-size:12px}
+html,body { margin:0; padding:0; height:100%; width:100%; background:#1a1a1a; display:flex; justify-content:center; align-items:center; overflow:hidden; }
+#canvas { width:100%; height:100%; display:block; background:#1a1a1a; }
+#overlay { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; transition:opacity .3s ease; pointer-events:none; }
+#box { text-align:center; color:white; font-family:sans-serif; }
+#toolbar { position:absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,0.5); border-radius:8px; padding:5px 10px; }
+#toolbar button { color:white; background:#222; border:1px solid #444; border-radius:5px; padding:4px 8px; margin:2px; cursor:pointer; }
+#filesystem { display:none; position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.6); padding:8px; border-radius:8px; color:#fff; font-size:13px; }
+.error { color:red; }
 </style>
-
-<meta name="description" content="Play OpenTTD Online instantly in your web browser — no downloads required. Experience the full open-source transport tycoon simulator with trains, planes, ships, and road vehicles, all playable directly online. Build your transport empire anywhere, anytime.">
-<meta name="keywords" content="OpenTTD online, play OpenTTD in browser, OpenTTD web version, OpenTTD WebAssembly, Transport Tycoon online, open source transport game, transport tycoon browser, online simulation game, web transport tycoon, OpenTTD for Chrome, OpenTTD Web Build">
-<meta name="author" content="overgrown-games.com">
-<meta property="og:title" content="OpenTTD Online – Play in Your Browser">
-<meta property="og:description" content="Play the full OpenTTD transport tycoon simulator directly in your web browser. Build, manage, and expand your transport empire online.">
-<meta property="og:type" content="website">
-<meta property="og:url" content="https://openttdonline.com/">
 <link rel="icon" type="image/png" href="favicon.png">
 </head>
-
 <body>
-<button class="ttd-toggle" id="ttd-toggle" type="button">Saves</button>
-
-<div class="ttd-toolbar" id="ttd-toolbar" aria-hidden="true">
-  <strong>OpenTTD – Import/Export</strong>
-  <input id="ttd-file-input" type="file" accept=".sav,.scn,.cfg,.grf,.dat,.obg,.obm,.obs">
-  <button id="ttd-import-btn" type="button" disabled>Import</button>
-  <select id="ttd-save-list" title="Saved games"></select>
-  <button id="ttd-export-btn" type="button" disabled>Export selected</button>
-  <span class="ttd-status" id="ttd-status">Waiting for FS…</span>
+<div id="toolbar">
+  <button onclick="exportSave()">Export Save</button>
+  <button onclick="importSave()">Import Save</button>
 </div>
 
-<div class="background"><div id="box"><div id="title">Loading ...</div><div id="message"></div></div></div>
-<div id="overlay" class="overlay"><div id="filesystem">Warning: savegames are stored in the Indexed DB of your browser.<br>Your browser can delete savegames without notice!</div></div>
-<div><canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas></div>
+<canvas id="canvas" tabindex="-1"></canvas>
+
+<div id="overlay">
+  <div id="box">
+    <h2 id="title">(0 / 42) Loading ...</h2>
+    <p id="message">Preparing game ...</p>
+  </div>
+</div>
+
+<div id="filesystem">Saving files...</div>
 
 <script>
-/* Ensure Module exists early so openttd.js can attach safely */
-var Module = window.Module || { preRun:[], postRun:[], arguments:[], totalDependencies:42, doneDependencies:0, lastDependencies:1 };
-Module.print = function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")); console.log(e);};
-Module.printErr = function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")); console.error(e);};
-Module.canvas = (function(){var e=document.getElementById("canvas"); e.addEventListener("webglcontextlost",function(t){alert("WebGL context lost. You will need to reload the page."); t.preventDefault();},!1); return e;})();
-Module.setStatus = function(e){ if(document.getElementById("canvas").style.display!=="none"){ var n=e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/); if(n) e="("+n[2]+" / "+n[4]+") "+n[1]; document.getElementById("message").innerHTML=e; } };
-Module.monitorRunDependencies = function(e){ if(e<Module.lastDependencies) Module.doneDependencies+=1; Module.lastDependencies=e; var total=Module.totalDependencies, doing=Module.doneDependencies+1; if(doing>total) doing=total; document.getElementById("title").innerHTML="("+doing+" / "+total+") Loading ..."; document.getElementById("message").innerHTML="Preparing game ..."; };
-Module.onBootstrap = function(e,n){ document.getElementById("canvas").style.display="none"; document.getElementById("title").innerHTML="Missing base graphics"; document.getElementById("message").innerHTML="OpenTTD is downloading base graphics.<br/><br/>"+e+" / "+n+" bytes downloaded."; };
-Module.onBootstrapFailed = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("title").innerHTML="Missing base graphics"; document.getElementById("message").innerHTML="Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again."; };
-Module.onBootstrapReload = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("title").innerHTML="Missing base graphics"; document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game."; };
-Module.onExit = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("title").innerHTML="Thank you for playing!"; document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game."; };
-Module.onAbort = function(){ document.getElementById("canvas").style.display="none"; document.getElementById("box").className="error"; document.getElementById("title").innerHTML="Crash :("; document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game."; };
-Module.onWarningFs = function(){ document.getElementById("filesystem").style.display="inline-block"; document.getElementById("overlay").style.opacity=1; setTimeout(function(){ document.getElementById("overlay").style.opacity=0; setTimeout(function(){ document.getElementById("filesystem").style.display="none"); },300); },10000); };
+/* ---- Fixed Module bootstrap ---- */
+var Module = window.Module || {};
+Module.preRun  = Module.preRun  || [];
+Module.postRun = Module.postRun || [];
+Module.arguments = Module.arguments || [];
+Module.totalDependencies = Module.totalDependencies || 42;
+Module.doneDependencies  = Module.doneDependencies  || 0;
+Module.lastDependencies  = Module.lastDependencies  || 1;
+
+Module.print = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.log(e); };
+Module.printErr = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.error(e); };
+Module.canvas = (function(){
+  var e=document.getElementById("canvas");
+  e.addEventListener("webglcontextlost",function(t){ alert("WebGL context lost. You will need to reload the page."); t.preventDefault(); },false);
+  return e;
+})();
+Module.setStatus = function(e){
+  if(document.getElementById("canvas").style.display!=="none"){
+    var n=e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+    if(n) e="("+n[2]+" / "+n[4]+") "+n[1];
+    document.getElementById("message").innerHTML=e;
+  }
+};
+Module.monitorRunDependencies = function(e){
+  if(e<Module.lastDependencies) Module.doneDependencies+=1;
+  Module.lastDependencies=e;
+  var total=Module.totalDependencies, doing=Module.doneDependencies+1;
+  if(doing>total) doing=total;
+  document.getElementById("title").innerHTML="("+doing+" / "+total+") Loading ...";
+  document.getElementById("message").innerHTML="Preparing game ...";
+};
+Module.onBootstrap = function(e,n){
+  document.getElementById("canvas").style.display="none";
+  document.getElementById("title").innerHTML="Missing base graphics";
+  document.getElementById("message").innerHTML="OpenTTD is downloading base graphics.<br/><br/>"+e+" / "+n+" bytes downloaded.";
+};
+Module.onBootstrapFailed = function(){
+  document.getElementById("canvas").style.display="none";
+  document.getElementById("title").innerHTML="Missing base graphics";
+  document.getElementById("message").innerHTML="Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again.";
+};
+Module.onBootstrapReload = function(){
+  document.getElementById("canvas").style.display="none";
+  document.getElementById("title").innerHTML="Missing base graphics";
+  document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game.";
+};
+Module.onExit = function(){
+  document.getElementById("canvas").style.display="none";
+  document.getElementById("title").innerHTML="Thank you for playing!";
+  document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game.";
+};
+Module.onAbort = function(){
+  document.getElementById("canvas").style.display="none";
+  document.getElementById("box").className="error";
+  document.getElementById("title").innerHTML="Crash :(";
+  document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game.";
+};
+Module.onWarningFs = function(){
+  document.getElementById("filesystem").style.display="inline-block";
+  document.getElementById("overlay").style.opacity = 1;
+  setTimeout(function(){
+    document.getElementById("overlay").style.opacity = 0;
+    setTimeout(function(){
+      document.getElementById("filesystem").style.display = "none";
+    }, 300);
+  }, 10000);
+};
 window.onerror=function(){ Module.onAbort(); };
-/* Keep file paths relative */
 Module.locateFile = function (p) { return p; };
 </script>
 
-<!-- Game runtime -->
-<script src="openttd.js" crossorigin="anonymous"></script>
-
-<!-- Touch pinch-to-zoom helper -->
 <script>
-(function(){
-  const SENSITIVITY = 0.2;
-  function attach(){
-    const canvas=(window.Module&&Module.canvas)||document.getElementById('canvas'); if(!canvas) return false;
-    canvas.style.touchAction='none'; canvas.style.cursor='none';
-    let last=0; const dist=(a,b)=>Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
-    canvas.addEventListener('touchstart',e=>{ if(e.touches.length===2){ e.preventDefault(); last=dist(e.touches[0],e.touches[1]); } },{passive:false});
-    canvas.addEventListener('touchmove',e=>{
-      if(e.touches.length!==2) return; e.preventDefault();
-      const d=dist(e.touches[0],e.touches[1]); const scale=d/last;
-      if(Math.abs(scale-1)>0.01){
-        const cx=(e.touches[0].clientX+e.touches[1].clientX)/2, cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
-        const delta=(Math.log(scale)/Math.log(1.05))*120*SENSITIVITY;
-        canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-delta,clientX:cx,clientY:cy,bubbles:true}));
-        last=d;
-      }
-    },{passive:false});
-    return true;
+async function exportSave() {
+  try {
+    const data = await FS.readFile('/.openttd/save/autosave.sav');
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'openttd_save.sav';
+    a.click();
+  } catch (e) {
+    alert('Export failed: ' + e.message);
   }
-  if(!attach()){
-    const prev=(window.Module&&Module.onRuntimeInitialized)||null;
-    window.Module=window.Module||{};
-    Module.onRuntimeInitialized=function(){ if(prev) prev(); attach(); };
-    window.addEventListener('load',()=>setTimeout(attach,0));
-  }
-})();
+}
+
+async function importSave() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.sav';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const arrayBuffer = await file.arrayBuffer();
+    FS.writeFile('/.openttd/save/imported.sav', new Uint8Array(arrayBuffer));
+    alert('Save imported! Load it in-game via the "Load Game" menu.');
+  };
+  input.click();
+}
 </script>
 
-<!-- Toolbar, IDBFS mounting and save import/export -->
-<script>
-(function () {
-  const $ = (id) => document.getElementById(id);
-  const toggleBtn = $('ttd-toggle');
-  const bar = $('ttd-toolbar');
-  const fileInput = $('ttd-file-input');
-  const importBtn = $('ttd-import-btn');
-  const exportBtn = $('ttd-export-btn');
-  const saveList  = $('ttd-save-list');
-  const statusEl  = $('ttd-status');
-
-  importBtn.disabled = true; exportBtn.disabled = true;
-  const setStatus = (m) => statusEl.textContent = m;
-
-  const getFS = () => (window.Module && Module.FS) ? Module.FS : (typeof FS !== 'undefined' ? FS : null);
-  const getIDB = () => (window.Module && Module.IDBFS) ? Module.IDBFS : (typeof IDBFS !== 'undefined' ? IDBFS : null);
-  const getCanvas = () => document.getElementById('canvas') || document.querySelector('canvas');
-
-  const applyCanvasOffset = () => { const c=getCanvas(); if(!c) return; c.style.marginTop = bar.classList.contains('open') ? 'var(--ttd-toolbar-h)' : '0px'; };
-  toggleBtn.addEventListener('click', () => { const open=!bar.classList.contains('open'); bar.classList.toggle('open',open); bar.setAttribute('aria-hidden',String(!open)); applyCanvasOffset(); });
-  applyCanvasOffset(); window.addEventListener('resize', applyCanvasOffset);
-
-  const pathExists = (FS, p) => { try { FS.lookupPath(p); return true; } catch { return false; } };
-  const isDir = (FS, p) => { try { return (FS.stat(p).mode & 0x4000) === 0x4000; } catch { return false; } };
-  const safeStat = (FS, p) => { try { return FS.stat(p); } catch { return null; } };
-  const mkdirp = (FS, p) => { const parts=p.split('/').filter(Boolean); let cur=''; for(const part of parts){ cur+='/'+part; try{ FS.mkdir(cur); }catch{} } };
-
-  // Sync queue that only runs if IDBFS is mounted at /.openttd
-  let _syncBusy=false,_queue=false,_mounted=false;
-  const hasMount = (FS) => {
-    try { const node = FS.lookupPath('/.openttd').node; return !!(node && node.mounted && node.mounted.type && node.mounted.type.mount); }
-    catch { return false; }
-  };
-  const syncfs = () => new Promise((res,rej)=>{
-    const FS=getFS(); if(!FS || !_mounted || !hasMount(FS)){ res(); return; }
-    const run=()=>{ _syncBusy=true; FS.syncfs(false,(err)=>{ _syncBusy=false; if(_queue){ _queue=false; setTimeout(()=>syncfs().then(res,rej),60);} err?rej(err):res(); }); };
-    if(_syncBusy){ _queue=true; setTimeout(()=>syncfs().then(res,rej),120); } else run();
-  });
-
-  // Ensure /.openttd is a directory, mount IDBFS there, and create /save
-  async function ensureStorageMounted() {
-    const FS=getFS(), IDB=getIDB();
-    if (!FS) return false;
-    try {
-      if (pathExists(FS, '/.openttd') && !isDir(FS, '/.openttd')) {
-        // It’s a file/symlink → remove and recreate as directory
-        try { FS.unlink('/.openttd'); } catch {}
-      }
-      if (!pathExists(FS, '/.openttd')) {
-        FS.mkdir('/.openttd');
-      }
-      if (IDB && !hasMount(FS)) {
-        FS.mount(IDB, {}, '/.openttd');
-        await new Promise((ok,err)=>FS.syncfs(true, (e)=> e?err(e):ok()));
-      }
-      _mounted = hasMount(FS);
-      mkdirp(FS, '/.openttd/save');
-      return true;
-    } catch (e) {
-      console.error('ensureStorageMounted failed', e);
-      return false;
-    }
-  }
-
-  const listSaves = (FS) => {
-    try {
-      const items = FS.readdir('/.openttd/save').filter(f=>f!=='.'&&f!=='..'&&f.toLowerCase().endsWith('.sav'));
-      items.sort((a,b)=> (safeStat(FS,'/.openttd/save/'+b)?.mtime||0) - (safeStat(FS,'/.openttd/save/'+a)?.mtime||0));
-      return items;
-    } catch { return []; }
-  };
-
-  const refreshList = () => {
-    const FS=getFS(); saveList.innerHTML='';
-    if (!FS || !_mounted) {
-      const opt=document.createElement('option'); opt.value=''; opt.textContent='(storage not ready)'; saveList.appendChild(opt); return;
-    }
-    const items=listSaves(FS);
-    if(items.length===0){ const opt=document.createElement('option'); opt.value=''; opt.textContent='(no .sav files found)'; saveList.appendChild(opt); return; }
-    for(const f of items){ const opt=document.createElement('option'); opt.value=f; opt.textContent=f; saveList.appendChild(opt); }
-  };
-
-  $('ttd-import-btn').addEventListener('click', async () => {
-    const FS=getFS(); if(!FS){ setStatus('FS not ready'); return; }
-    const file=fileInput.files && fileInput.files[0]; if(!file){ setStatus('Choose a file to import'); return; }
-    try{
-      setStatus('Importing '+file.name+' …');
-      await ensureStorageMounted();
-      const buf=await file.arrayBuffer();
-      FS.writeFile('/.openttd/save/'+file.name, new Uint8Array(buf));
-      await syncfs();
-      setStatus('Imported to /.openttd/save/'+file.name);
-      refreshList();
-    }catch(e){ console.error(e); setStatus('Import failed: '+(e && e.message || e)); }
-  });
-
-  $('ttd-export-btn').addEventListener('click', () => {
-    const FS=getFS(); if(!FS){ setStatus('FS not ready'); return; }
-    const filename=saveList.value; if(!filename){ setStatus('No save selected'); return; }
-    try{
-      const data=FS.readFile('/.openttd/save/'+filename);
-      const blob=new Blob([data],{type:'application/octet-stream'});
-      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; document.body.appendChild(a); a.click();
-      setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},100);
-      setStatus('Exported '+filename);
-    }catch(e){ console.error(e); setStatus('Export failed: '+(e && e.message || e)); }
-  });
-
-  function fsReady(){ const FS=getFS(); return !!(FS && FS.root); }
-
-  async function initIfReady(){
-    if (!fsReady()) return false;
-    const ok = await ensureStorageMounted();
-    if (ok) {
-      refreshList();
-      setStatus('Ready (/.openttd/save)');
-      importBtn.disabled=false; exportBtn.disabled=false;
-    }
-    return ok;
-  }
-
-  (Module.postRun = Module.postRun || []).push(() => { initIfReady(); });
-  let tries=0;
-  const t=setInterval(async()=>{ if(await initIfReady() || ++tries>400) clearInterval(t); if(_mounted) refreshList(); },150);
-})();
-</script>
-
+<!-- Load Emscripten build last -->
+<script src="openttd.js"></script>
 </body>
 </html>
