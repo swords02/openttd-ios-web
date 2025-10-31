@@ -342,6 +342,9 @@ MEMORYCHECK_SUPPRESSIONS_FILE:FILEPATH=
 //Path to a program.
 NFORENUM_EXECUTABLE:FILEPATH=NFORENUM_EXECUTABLE-NOTFOUND
 
+//No help, variable specified on the command line.
+OPENTTD_VERSION_STRING:UNINITIALIZED=Online
+
 //Allow loading of content with invalid signatures
 OPTION_ALLOW_INVALID_SIGNATURE:BOOL=OFF
 
@@ -431,7 +434,7 @@ PKG_CONFIG_EXECUTABLE:FILEPATH=PKG_CONFIG_EXECUTABLE-NOTFOUND
 SHARED_DIR:STRING=(not set)
 
 //Name of the computer/site where compile is being run
-SITE:STRING=b600481cdbf1
+SITE:STRING=172e10f752fd
 
 //Value Computed by CMake
 openttd_BINARY_DIR:STATIC=/src/build
