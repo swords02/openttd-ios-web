@@ -47,12 +47,14 @@
   #toolbar{
     position:fixed;top:54px;left:10px;z-index:3;
     background:rgba(0,0,0,.55);border:1px solid #333;border-radius:8px;
-    padding:6px 10px;backdrop-filter:blur(2px);
-    display:none
+    padding:8px 10px;backdrop-filter:blur(2px);
+    display:none;
+    display:flex;flex-direction:column;gap:6px; /* vertical stack */
+    min-width:220px;
   }
   #toolbar button{
     color:#eee;background:#222;border:1px solid #444;border-radius:6px;
-    padding:6px 10px;margin:0 4px 6px 0;cursor:pointer
+    padding:8px 10px;cursor:pointer;width:100%;text-align:left;
   }
   #toolbar button:hover{background:#2b2b2b}
 
@@ -123,9 +125,9 @@
   <div id="filesystem">Saving files…</div>
 
   <script>
-    const SAVE_DIR = '/home/web_user/.openttd/save/';
-    const SCEN_DIR = '/home/web_user/.openttd/scenario/';
-    const HEIGHT_DIR = '/home/web_user/.openttd/heightmap/'; // NEW: heightmaps
+    const SAVE_DIR   = '/home/web_user/.openttd/save/';
+    const SCEN_DIR   = '/home/web_user/.openttd/scenario/';
+    const HEIGHT_DIR = '/home/web_user/.openttd/scenario/heightmap/'; // UPDATED
 
     const toolbar = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
@@ -309,7 +311,6 @@
         if(!name){alert('No heightmap (.png or .bmp) found in '+HEIGHT_DIR);return;}
         const data=FS.readFile(HEIGHT_DIR+name);
         const a=document.createElement('a');
-        // Try to preserve content-type by extension (optional)
         const type = name.toLowerCase().endsWith('.png') ? 'image/png'
                    : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
                    : 'application/octet-stream';
@@ -327,7 +328,7 @@
           mkdirp(HEIGHT_DIR);
           FS.writeFile(HEIGHT_DIR+f.name,new Uint8Array(buf));
           if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
-          alert('Imported heightmap to '+HEIGHT_DIR+f.name+'\n\nLoad it from: Main menu → Scenario Editor → Heightmap.');
+          alert('Imported heightmap to '+HEIGHT_DIR+f.name+'\n\nLoad it from: Scenario Editor → Heightmap.');
         }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
