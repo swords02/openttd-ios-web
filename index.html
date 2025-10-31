@@ -32,37 +32,19 @@
 
 <link rel="icon" type="image/png" href="favicon.png">
 
-<!-- Collapsible toolbar styles (non-blocking) -->
+<!-- Collapsible toolbar styles -->
 <style>
   :root { --ttd-toolbar-h: 48px; }
-
-  .ttd-toggle {
-    position: fixed; top: 8px; left: 8px; z-index: 9999;
-    background: #111; color: #eee; border: 1px solid #3a3a3a; border-radius: 999px;
-    padding: 6px 10px; font: 13px/1 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-    cursor: pointer; opacity: .9;
-  }
-  .ttd-toggle:hover { opacity: 1; }
-
-  .ttd-toolbar {
-    position: fixed; top: 0; left: 0; right: 0; height: var(--ttd-toolbar-h);
-    display: none; gap: 8px; align-items: center;
-    padding: 8px 12px; background: #111; color: #eee; z-index: 9998;
-    border-bottom: 1px solid #333; box-shadow: 0 2px 10px rgba(0,0,0,.35);
-  }
-  .ttd-toolbar.open { display: flex; }
-
-  .ttd-toolbar input[type="file"] { color: #ccc; max-width: 280px; }
-  .ttd-toolbar button, .ttd-toolbar select {
-    background:#222; color:#eee; border:1px solid #444; border-radius:6px;
-    padding:6px 10px; cursor:pointer;
-  }
-  .ttd-toolbar button:hover, .ttd-toolbar select:hover { background:#2d2d2d; }
-
-  .ttd-toolbar:not(.open) { pointer-events: none; }
-  .ttd-toolbar.open { pointer-events: auto; }
-
-  .ttd-status { margin-left:auto; opacity:.85; font-size:12px; }
+  .ttd-toggle{position:fixed;top:8px;left:8px;z-index:9999;background:#111;color:#eee;border:1px solid #3a3a3a;border-radius:999px;padding:6px 10px;font:13px/1 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;cursor:pointer;opacity:.9}
+  .ttd-toggle:hover{opacity:1}
+  .ttd-toolbar{position:fixed;top:0;left:0;right:0;height:var(--ttd-toolbar-h);display:none;gap:8px;align-items:center;padding:8px 12px;background:#111;color:#eee;z-index:9998;border-bottom:1px solid #333;box-shadow:0 2px 10px rgba(0,0,0,.35)}
+  .ttd-toolbar.open{display:flex}
+  .ttd-toolbar input[type="file"]{color:#ccc;max-width:280px}
+  .ttd-toolbar button,.ttd-toolbar select{background:#222;color:#eee;border:1px solid #444;border-radius:6px;padding:6px 10px;cursor:pointer}
+  .ttd-toolbar button:hover,.ttd-toolbar select:hover{background:#2d2d2d}
+  .ttd-toolbar:not(.open){pointer-events:none}
+  .ttd-toolbar.open{pointer-events:auto}
+  .ttd-status{margin-left:auto;opacity:.85;font-size:12px}
 </style>
 </head>
 
@@ -74,8 +56,8 @@
 <div class="ttd-toolbar" id="ttd-toolbar" aria-hidden="true">
   <strong>OpenTTD – Import/Export</strong>
   <input id="ttd-file-input" type="file" accept=".sav,.scn,.cfg,.grf,.dat,.obg,.obm,.obs">
-  <button id="ttd-import-btn" type="button" disabled>Import to / .openttd / save</button>
-  <select id="ttd-save-list" title="Saved games in /.openttd/save"></select>
+  <button id="ttd-import-btn" type="button" disabled>Import</button>
+  <select id="ttd-save-list" title="Saved games"></select>
   <button id="ttd-export-btn" type="button" disabled>Export selected</button>
   <span class="ttd-status" id="ttd-status">Waiting for FS…</span>
 </div>
@@ -96,16 +78,13 @@ var statusElement=document.getElementById("status"),progressElement=document.get
   function attach(){
     const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
     if (!canvas) return false;
-    canvas.style.touchAction = 'none';
-    canvas.style.cursor = 'none';
+    canvas.style.touchAction='none'; canvas.style.cursor='none';
     let pA=null,pB=null,lastDist=0;
     const pinchDist=(t1,t2)=>Math.hypot(t1.clientX-t2.clientX,t1.clientY-t2.clientY);
-    canvas.addEventListener('touchstart',e=>{
-      if(e.touches.length===2){e.preventDefault();pA=e.touches[0];pB=e.touches[1];lastDist=pinchDist(pA,pB);}
-    },{passive:false});
+    canvas.addEventListener('touchstart',e=>{ if(e.touches.length===2){e.preventDefault();pA=e.touches[0];pB=e.touches[1];lastDist=pinchDist(pA,pB);} },{passive:false});
     canvas.addEventListener('touchmove',e=>{
       if(e.touches.length!==2)return; e.preventDefault();
-      const t1=e.touches[0],t2=e.touches[1],dist=pinchDist(t1,t2),scale=dist/lastDist;
+      const [t1,t2]=[e.touches[0],e.touches[1]],dist=pinchDist(t1,t2),scale=dist/lastDist;
       if(Math.abs(scale-1)>0.01){
         const cx=(t1.clientX+t2.clientX)/2, cy=(t1.clientY+t2.clientY)/2;
         const delta=(Math.log(scale)/Math.log(1.05))*120*SENSITIVITY;
@@ -113,20 +92,20 @@ var statusElement=document.getElementById("status"),progressElement=document.get
         lastDist=dist;
       }
     },{passive:false});
-    canvas.addEventListener('touchend',e=>{if(e.touches.length<2)pA=pB=null;},{passive:false});
-    canvas.addEventListener('touchcancel',()=>{pA=pB=null;},{passive:false});
+    canvas.addEventListener('touchend',e=>{ if(e.touches.length<2) pA=pB=null; },{passive:false});
+    canvas.addEventListener('touchcancel',()=>{ pA=pB=null; },{passive:false});
     return true;
   }
   if(!attach()){
     const prev=(window.Module&&Module.onRuntimeInitialized)||null;
     window.Module=window.Module||{};
-    Module.onRuntimeInitialized=function(){if(prev)prev();attach();};
+    Module.onRuntimeInitialized=function(){ if(prev) prev(); attach(); };
     window.addEventListener('load',()=>setTimeout(attach,0));
   }
 })();
 </script>
 
-<!-- Collapsible toolbar logic (no mount/sync at startup) -->
+<!-- Collapsible toolbar logic (writes to OpenTTD's real personal dir) -->
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -138,96 +117,106 @@ var statusElement=document.getElementById("status"),progressElement=document.get
   const saveList  = $('ttd-save-list');
   const statusEl  = $('ttd-status');
 
-  importBtn.disabled = true;
-  exportBtn.disabled = true;
-
+  importBtn.disabled = true; exportBtn.disabled = true;
   const setStatus = (m) => statusEl.textContent = m;
 
   const getFS    = () => (window.Module && Module.FS)    ? Module.FS    : (typeof FS !== 'undefined' ? FS    : null);
+  const getENV   = () => (window.Module && Module.ENV)   ? Module.ENV   : (typeof ENV !== 'undefined' ? ENV   : {});
   const getIDBFS = () => (window.Module && Module.IDBFS) ? Module.IDBFS : (typeof IDBFS !== 'undefined' ? IDBFS : null);
 
+  // UI layout
   const getCanvas = () => document.getElementById('canvas') || document.querySelector('canvas');
-  const applyCanvasOffset = () => {
-    const c = getCanvas(); if (!c) return;
-    c.style.marginTop = bar.classList.contains('open') ? 'var(--ttd-toolbar-h)' : '0px';
-  };
-  toggleBtn.addEventListener('click', () => {
-    const open = !bar.classList.contains('open');
-    bar.classList.toggle('open', open);
-    bar.setAttribute('aria-hidden', String(!open));
-    applyCanvasOffset();
-  });
-  applyCanvasOffset();
-  window.addEventListener('resize', applyCanvasOffset);
+  const applyCanvasOffset = () => { const c=getCanvas(); if(!c) return; c.style.marginTop = bar.classList.contains('open') ? 'var(--ttd-toolbar-h)' : '0px'; };
+  toggleBtn.addEventListener('click', () => { const open=!bar.classList.contains('open'); bar.classList.toggle('open',open); bar.setAttribute('aria-hidden',String(!open)); applyCanvasOffset(); });
+  applyCanvasOffset(); window.addEventListener('resize', applyCanvasOffset);
 
+  // FS helpers
   const pathExists = (FS, p) => { try { FS.lookupPath(p); return true; } catch { return false; } };
-  const ensureSaveDir = (FS) => { try { FS.mkdir('/.openttd'); } catch {} try { FS.mkdir('/.openttd/save'); } catch {} };
-  const safeStat = (FS, p) => { try { return FS.stat(p); } catch { return null; } };
+  const safeStat   = (FS, p) => { try { return FS.stat(p); } catch { return null; } };
+  const mkdirp = (FS, p) => {
+    const parts = p.split('/').filter(Boolean);
+    let cur = '';
+    for (const part of parts){ cur += '/' + part; try{ FS.mkdir(cur); }catch{} }
+  };
 
   // Debounced sync after writes only
-  let _syncBusy = false, _syncQueued = false;
-  const syncfs = (populate) => new Promise((resolve, reject) => {
-    const FS = getFS(); if (!FS) { resolve(); return; }
-    const run = () => {
-      _syncBusy = true;
-      FS.syncfs(!!populate, (err) => {
-        _syncBusy = false;
-        if (_syncQueued) { _syncQueued = false; setTimeout(() => syncfs(false), 60); }
-        err ? reject(err) : resolve();
-      });
-    };
-    if (_syncBusy) { _syncQueued = true; setTimeout(() => syncfs(populate).then(resolve, reject), 120); }
-    else run();
+  let _syncBusy=false,_syncQueued=false;
+  const syncfs = (populate) => new Promise((resolve,reject)=>{
+    const FS=getFS(); if(!FS){ resolve(); return; }
+    const run=()=>{ _syncBusy=true; FS.syncfs(!!populate,(err)=>{ _syncBusy=false; if(_syncQueued){ _syncQueued=false; setTimeout(()=>syncfs(false),60);} err?reject(err):resolve(); }); };
+    if(_syncBusy){ _syncQueued=true; setTimeout(()=>syncfs(populate).then(resolve,reject),120); } else run();
   });
+
+  // Detect OpenTTD personal dir (where the game actually looks)
+  function detectPersonalDir(FS) {
+    const ENV = getENV();
+    const home = ENV?.HOME || '/home/web_user';
+    const candidates = [
+      home + '/.openttd',
+      '/home/web_user/.openttd',
+      '/root/.openttd',
+      '/home/.openttd',
+      '/.openttd'
+    ];
+    for (const p of candidates){
+      if (pathExists(FS, p)) return p;
+    }
+    // If none exist yet, prefer HOME
+    return home + '/.openttd';
+  }
+
+  let PERSONAL = null;
+  let SAVE_DIR = null;
+
+  function ensurePersonal(FS){
+    PERSONAL = detectPersonalDir(FS);
+    SAVE_DIR = PERSONAL + '/save';
+    mkdirp(FS, SAVE_DIR);
+
+    // Create a compatibility symlink so older paths still work
+    try {
+      if (!pathExists(FS, '/.openttd')) {
+        FS.symlink(PERSONAL, '/.openttd');
+      }
+    } catch { /* ignore if FS forbids symlinks */ }
+  }
 
   const listSaves = (FS) => {
     let items = [];
     try {
-      items = FS.readdir('/.openttd/save').filter(f => f !== '.' && f !== '..' && f.toLowerCase().endsWith('.sav'));
+      items = FS.readdir(SAVE_DIR).filter(f => f !== '.' && f !== '..' && f.toLowerCase().endsWith('.sav'));
     } catch {}
     items.sort((a,b)=>{
-      const sa = safeStat(FS,'/.openttd/save/'+a)?.mtime||0;
-      const sb = safeStat(FS,'/.openttd/save/'+b)?.mtime||0;
-      return sb-sa;
+      const sa = safeStat(FS, SAVE_DIR + '/' + a)?.mtime || 0;
+      const sb = safeStat(FS, SAVE_DIR + '/' + b)?.mtime || 0;
+      return sb - sa;
     });
     return items;
   };
 
   const refreshList = () => {
-    const FS = getFS();
-    saveList.innerHTML = '';
-    if (!FS || !pathExists(FS, '/.openttd/save')) {
-      const opt = document.createElement('option');
-      opt.value=''; opt.textContent='(storage not ready)';
-      saveList.appendChild(opt);
-      return;
+    const FS = getFS(); saveList.innerHTML='';
+    if (!FS || !PERSONAL || !pathExists(FS, SAVE_DIR)) {
+      const opt=document.createElement('option'); opt.value=''; opt.textContent='(storage not ready)'; saveList.appendChild(opt); return;
     }
     const items = listSaves(FS);
-    if (items.length===0){
-      const opt=document.createElement('option');
-      opt.value=''; opt.textContent='(no .sav files found)';
-      saveList.appendChild(opt);
-      return;
-    }
-    for (const f of items){
-      const opt=document.createElement('option');
-      opt.value=f; opt.textContent=f;
-      saveList.appendChild(opt);
-    }
+    if (items.length===0){ const opt=document.createElement('option'); opt.value=''; opt.textContent='(no .sav files found)'; saveList.appendChild(opt); return; }
+    for (const f of items){ const opt=document.createElement('option'); opt.value=f; opt.textContent=f; saveList.appendChild(opt); }
   };
 
+  // Handlers
   importBtn.addEventListener('click', async () => {
     const FS = getFS();
     if (!FS) { setStatus('FS not ready'); return; }
     const file = fileInput.files && fileInput.files[0];
     if (!file) { setStatus('Choose a file to import'); return; }
     try {
-      ensureSaveDir(FS);
+      ensurePersonal(FS);
       setStatus('Importing ' + file.name + ' …');
       const buf = await file.arrayBuffer();
-      FS.writeFile('/.openttd/save/' + file.name, new Uint8Array(buf));
-      await syncfs(false); // push after write only
-      setStatus('Imported to /.openttd/save/' + file.name);
+      FS.writeFile(SAVE_DIR + '/' + file.name, new Uint8Array(buf));
+      await syncfs(false);
+      setStatus('Imported to ' + SAVE_DIR + '/' + file.name);
       refreshList();
     } catch (e) {
       console.error(e); setStatus('Import failed: ' + e.message);
@@ -240,7 +229,7 @@ var statusElement=document.getElementById("status"),progressElement=document.get
     const filename = saveList.value;
     if (!filename) { setStatus('No save selected'); return; }
     try {
-      const data = FS.readFile('/.openttd/save/' + filename);
+      const data = FS.readFile(SAVE_DIR + '/' + filename);
       const blob = new Blob([data], { type: 'application/octet-stream' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -253,20 +242,20 @@ var statusElement=document.getElementById("status"),progressElement=document.get
     }
   });
 
-  // Lazy init: do NOT mount/sync here; just wait for OpenTTD to expose FS.
+  // Lazy init: do NOT mount/sync at startup; wait for OpenTTD’s FS.
   function fsReady(){
     const FS = getFS(); if (!FS) return false;
-    return pathExists(FS,'/.openttd') || pathExists(FS,'/.openttd/save') || !!getIDBFS();
+    // If IDBFS is mounted by the game, we should see either HOME/.openttd or /.openttd soon
+    return !!FS.root;
   }
 
   async function initIfReady(){
     if (!fsReady()) return false;
     try{
-      const FS = getFS(); if (FS) ensureSaveDir(FS);
+      const FS = getFS(); ensurePersonal(FS);
       refreshList();
-      setStatus('Ready');
-      importBtn.disabled=false;
-      exportBtn.disabled=false;
+      setStatus('Ready (' + SAVE_DIR + ')');
+      importBtn.disabled=false; exportBtn.disabled=false;
     }catch(e){ console.error(e); setStatus('Storage init failed'); }
     return true;
   }
@@ -276,8 +265,10 @@ var statusElement=document.getElementById("status"),progressElement=document.get
 
   let tries = 0;
   const t = setInterval(async () => {
-    if (await initIfReady() || ++tries > 300) clearInterval(t);
-  }, 100);
+    if (await initIfReady() || ++tries > 400) clearInterval(t);
+    // After first success keep list fresh for a bit (game may create dirs late)
+    if (PERSONAL) refreshList();
+  }, 150);
 })();
 </script>
 
