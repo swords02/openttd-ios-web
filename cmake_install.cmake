@@ -1,4 +1,4 @@
-# Install script for directory: /c/Users/oweng/OneDrive/Desktop/OpenTTD-master
+# Install script for directory: /src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -39,26 +39,26 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/bin/cmake_install.cmake")
+  include("/src/build/bin/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/src/cmake_install.cmake")
+  include("/src/build/src/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/media/cmake_install.cmake")
+  include("/src/build/media/cmake_install.cmake")
 endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/regression/cmake_install.cmake")
+  include("/src/build/regression/cmake_install.cmake")
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xRuntimex" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/games" TYPE EXECUTABLE FILES "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/openttd.html")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/games" TYPE EXECUTABLE FILES "/src/build/openttd.html")
   if(EXISTS "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/games/openttd.html" AND
      NOT IS_SYMLINK "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/games/openttd.html")
     if(CMAKE_INSTALL_DO_STRIP)
@@ -69,52 +69,52 @@ endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xRuntimex" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/games" TYPE FILE FILES
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/openttd.js"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/openttd.wasm"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/openttd.data"
+    "/src/build/openttd.js"
+    "/src/build/openttd.wasm"
+    "/src/build/openttd.data"
     )
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xdocsx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/doc/openttd" TYPE FILE FILES
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/COPYING.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/README.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/CREDITS.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/CONTRIBUTING.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/changelog.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/known-bugs.md"
+    "/src/COPYING.md"
+    "/src/README.md"
+    "/src/CREDITS.md"
+    "/src/CONTRIBUTING.md"
+    "/src/changelog.md"
+    "/src/known-bugs.md"
     )
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xdocsx" OR NOT CMAKE_INSTALL_COMPONENT)
   file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/doc/openttd/docs" TYPE FILE FILES
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/admin_network.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/debugging_desyncs.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/desync.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/directory_structure.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/eints.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/fonts.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/game_coordinator.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/linkgraph.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/logging_and_performance_metrics.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/multiplayer.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/savegame_format.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/symbol_server.md"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/obg_format.txt"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/obm_format.txt"
-    "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/obs_format.txt"
+    "/src/docs/admin_network.md"
+    "/src/docs/debugging_desyncs.md"
+    "/src/docs/desync.md"
+    "/src/docs/directory_structure.md"
+    "/src/docs/eints.md"
+    "/src/docs/fonts.md"
+    "/src/docs/game_coordinator.md"
+    "/src/docs/linkgraph.md"
+    "/src/docs/logging_and_performance_metrics.md"
+    "/src/docs/multiplayer.md"
+    "/src/docs/savegame_format.md"
+    "/src/docs/symbol_server.md"
+    "/src/docs/obg_format.txt"
+    "/src/docs/obm_format.txt"
+    "/src/docs/obs_format.txt"
     )
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xmanualx" OR NOT CMAKE_INSTALL_COMPONENT)
   
-                execute_process(COMMAND /usr/bin/cmake -E copy /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/docs/openttd.6 /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/openttd.6)
-                execute_process(COMMAND gzip -9 -n -f /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/openttd.6)
+                execute_process(COMMAND /usr/bin/cmake -E copy /src/docs/openttd.6 /src/build/docs/openttd.6)
+                execute_process(COMMAND gzip -9 -n -f /src/build/docs/openttd.6)
             
 endif()
 
 if("x${CMAKE_INSTALL_COMPONENT}x" STREQUAL "xmanualx" OR NOT CMAKE_INSTALL_COMPONENT)
-  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/man/man6" TYPE FILE FILES "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/openttd.6.gz")
+  file(INSTALL DESTINATION "${CMAKE_INSTALL_PREFIX}/share/man/man6" TYPE FILE FILES "/src/build/docs/openttd.6.gz")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -125,5 +125,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/src/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")
