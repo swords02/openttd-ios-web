@@ -27,8 +27,180 @@ canvas.emscripten{border:0 none;height:100%;position:absolute;width:100%;z-index
 
 <link rel="icon" type="image/png" href="favicon.png">
 
+<style>
+  .ttd-toolbar {
+    position: fixed; inset: 0 0 auto 0; height: 48px;
+    display: flex; gap: 8px; align-items: center;
+    padding: 8px 12px; background: #111; color: #eee; z-index: 9999;
+    font: 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    border-bottom: 1px solid #333;
+  }
+  .ttd-toolbar input[type="file"] { color: #ccc; }
+  .ttd-toolbar button, .ttd-toolbar select {
+    background:#222; color:#eee; border:1px solid #444; border-radius:6px;
+    padding:6px 10px; cursor:pointer;
+  }
+  .ttd-toolbar button:hover, .ttd-toolbar select:hover { background:#2d2d2d; }
+  .ttd-status { margin-left:auto; opacity:.85; }
+  body { padding-top: 56px; } /* push content below the fixed bar */
+</style>
+
 </head>
+
+<script>
+(() => {
+  // Emscripten FS helpers
+  const ensureDirs = (FS) => {
+    try { FS.mkdir('/.openttd'); } catch {}
+    try { FS.mkdir('/.openttd/save'); } catch {}
+  };
+
+  const mountIDBFS = (Module) => new Promise((resolve, reject) => {
+    const { FS, IDBFS } = Module;
+    ensureDirs(FS);
+    try { FS.mount(IDBFS, {}, '/.openttd'); } catch {}
+    // Load persisted files into memory
+    FS.syncfs(true, (err) => err ? reject(err) : resolve());
+  });
+
+  const listSaves = (FS) => {
+    try {
+      return FS.readdir('/.openttd/save')
+        .filter(f => !['.', '..'].includes(f))
+        .filter(f => f.toLowerCase().endsWith('.sav'));
+    } catch {
+      return [];
+    }
+  };
+
+  const statSafe = (FS, path) => { try { return FS.stat(path); } catch { return null; } };
+
+  const writeFilePersist = (Module, path, bytes) => new Promise((resolve, reject) => {
+    try {
+      Module.FS.writeFile(path, new Uint8Array(bytes));
+    } catch (e) { reject(e); return; }
+    // Persist to IDBFS
+    Module.FS.syncfs(false, (err) => err ? reject(err) : resolve());
+  });
+
+  const download = (filename, data) => {
+    const blob = new Blob([data], { type: 'application/octet-stream' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 100);
+  };
+
+  // UI elements
+  const $ = (id) => document.getElementById(id);
+  const fileInput = $('ttd-file-input');
+  const importBtn = $('ttd-import-btn');
+  const exportBtn = $('ttd-export-btn');
+  const saveList  = $('ttd-save-list');
+  const statusEl  = $('ttd-status');
+
+  const setStatus = (msg) => statusEl.textContent = msg;
+
+  // Called once Module is ready
+  const init = async (Module) => {
+    try {
+      setStatus('Mounting storage…');
+      await mountIDBFS(Module);
+      setStatus('Mounted /.openttd (persistent)');
+
+      // Ensure subdir exists then populate dropdown
+      Module.FS.mkdir('/.openttd/save'); // harmless if exists
+    } catch {}
+    refreshList(Module);
+  };
+
+  const refreshList = (Module) => {
+    const FS = Module.FS;
+    const items = listSaves(FS);
+    saveList.innerHTML = '';
+    if (items.length === 0) {
+      const opt = document.createElement('option');
+      opt.value = ''; opt.textContent = '(no .sav files found)';
+      saveList.appendChild(opt);
+      return;
+    }
+    // Sort by mtime desc
+    items.sort((a, b) => {
+      const sa = statSafe(FS, '/.openttd/save/' + a);
+      const sb = statSafe(FS, '/.openttd/save/' + b);
+      const ta = sa ? sa.mtime : 0, tb = sb ? sb.mtime : 0;
+      return tb - ta;
+    });
+    for (const f of items) {
+      const opt = document.createElement('option');
+      opt.value = f; opt.textContent = f;
+      saveList.appendChild(opt);
+    }
+  };
+
+  importBtn.addEventListener('click', async () => {
+    const file = fileInput.files && fileInput.files[0];
+    if (!file) { setStatus('Choose a file to import'); return; }
+    try {
+      setStatus('Reading ' + file.name + ' …');
+      const buf = await file.arrayBuffer();
+      const target = '/.openttd/save/' + file.name;
+      await writeFilePersist(Module, target, buf);
+      setStatus('Imported to ' + target);
+      refreshList(Module);
+    } catch (e) {
+      console.error(e);
+      setStatus('Import failed: ' + e.message);
+    }
+  });
+
+  exportBtn.addEventListener('click', () => {
+    const filename = saveList.value;
+    if (!filename) { setStatus('No save selected'); return; }
+    try {
+      const path = '/.openttd/save/' + filename;
+      const data = Module.FS.readFile(path);
+      download(filename, data);
+      setStatus('Exported ' + filename);
+    } catch (e) {
+      console.error(e);
+      setStatus('Export failed: ' + e.message);
+    }
+  });
+
+  // Hook into Emscripten module lifecycle:
+  // If your generated JS defines `Module`, use postRun; otherwise poll until ready.
+  window.Module = window.Module || {};
+  (Module.postRun = Module.postRun || []).push(() => init(Module));
+
+  // Fallback: if postRun didn’t run (older templates), try when FS appears
+  let _tick = 0;
+  const tryInit = setInterval(() => {
+    if (window.Module && Module.FS && Module.IDBFS) {
+      clearInterval(tryInit);
+      init(Module);
+    } else if (++_tick > 600) {
+      clearInterval(tryInit);
+      setStatus('Failed to initialize FS');
+    }
+  }, 100);
+})();
+</script>
+
 <body>
+<div class="ttd-toolbar">
+  <strong>OpenTTD – Import/Export</strong>
+  <label>
+    <input id="ttd-file-input" type="file" accept=".sav,.scn,.cfg,.grf,.dat,.obg,.obm,.obs" style="max-width:260px;">
+  </label>
+  <button id="ttd-import-btn" type="button">Import to / .openttd / save</button>
+  <select id="ttd-save-list" title="Saved games in /.openttd/save"></select>
+  <button id="ttd-export-btn" type="button">Export selected</button>
+  <span class="ttd-status" id="ttd-status">Ready</span>
+</div>
+
 <div class=background><div id=box><div id=title>Loading ...</div><div id=message></div></div></div>
 <div id=overlay class=overlay><div id=filesystem>Warning: savegames are stored in the Indexed DB of your browser.<br>Your browser can delete savegames without notice!</div></div>
 <div><canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas></div>
