@@ -7,153 +7,207 @@
 <meta name="description" content="Play OpenTTD online directly in your browser — build transport empires, connect cities, and manage industries in this classic open-source tycoon game!">
 <meta name="keywords" content="OpenTTD online, OpenTTD web, play OpenTTD browser, transport tycoon online, webassembly openttd, open transport tycoon deluxe">
 
-<!-- CSP that allows analytics + Emscripten -->
+<!--
+CSP:
+- The key fix is connect-src, which now permits the OpenTTD endpoints needed during bootstrap:
+  https://cdn.openttd.org        - base files
+  https://servers.openttd.org    - server list
+  https://bananas.openttd.org    - content index
+  wss://bananas-server.openttd.org - WebSocket used by Bananas
+  https://content.openttd.org     - content downloads (uses port 3978)
+  wss://content.openttd.org:3978  - in case WSS is used for that port
+- If you want to be more permissive and future-proof, replace the connect-src list with:  connect-src 'self' https: wss:;
+-->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com;
         script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com;
         script-src-attr 'self' 'unsafe-inline';
-        worker-src 'self' blob:;
-        connect-src 'self' https://cdn.openttd.org https://servers.openttd.org https://bananas.openttd.org https://cloudflareinsights.com https://*.cloudflareinsights.com;
-        img-src 'self' data: blob:;
         style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        font-src 'self' data:;
         object-src 'none';
+        worker-src 'self' blob:;
         base-uri 'self';
+        connect-src
+          'self'
+          https://cdn.openttd.org
+          https://servers.openttd.org
+          https://bananas.openttd.org
+          wss://bananas-server.openttd.org
+          https://content.openttd.org
+          wss://content.openttd.org:3978
+          https://cloudflareinsights.com
+          https://*.cloudflareinsights.com;
         upgrade-insecure-requests;
       ">
 
-<style>
-html,body { margin:0; padding:0; height:100%; width:100%; background:#1a1a1a; display:flex; justify-content:center; align-items:center; overflow:hidden; }
-#canvas { width:100%; height:100%; display:block; background:#1a1a1a; }
-#overlay { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; transition:opacity .3s ease; pointer-events:none; }
-#box { text-align:center; color:white; font-family:sans-serif; }
-#toolbar { position:absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,0.5); border-radius:8px; padding:5px 10px; }
-#toolbar button { color:white; background:#222; border:1px solid #444; border-radius:5px; padding:4px 8px; margin:2px; cursor:pointer; }
-#filesystem { display:none; position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.6); padding:8px; border-radius:8px; color:#fff; font-size:13px; }
-.error { color:red; }
-</style>
 <link rel="icon" type="image/png" href="favicon.png">
+
+<style>
+  html,body { margin:0; padding:0; height:100%; width:100%; background:#1a1a1a; display:flex; justify-content:center; align-items:center; overflow:hidden; }
+  #canvas { width:100%; height:100%; display:block; background:#1a1a1a; cursor:none; }
+  #overlay { position:absolute; top:0; left:0; right:0; bottom:0; display:flex; justify-content:center; align-items:center; transition:opacity .3s ease; pointer-events:none; }
+  #box { text-align:center; color:#eee; font: 15px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width:680px; }
+  #box h2 { margin:.2rem 0 .4rem; font-weight:600; font-size:18px; color:#fff; }
+  #toolbar { position:absolute; top:10px; left:10px; z-index:10; background:rgba(0,0,0,0.55); border:1px solid #333; border-radius:8px; padding:6px 10px; backdrop-filter: blur(2px); }
+  #toolbar button { color:#eee; background:#222; border:1px solid #444; border-radius:6px; padding:6px 10px; margin:0 4px 0 0; cursor:pointer; }
+  #toolbar button:hover { background:#2b2b2b; }
+  #filesystem { display:none; position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.6); padding:8px 10px; border-radius:8px; color:#fff; font-size:13px; border:1px solid #333; }
+  .error { color:#ff6b6b; }
+</style>
 </head>
+
 <body>
-<div id="toolbar">
-  <button onclick="exportSave()">Export Save</button>
-  <button onclick="importSave()">Import Save</button>
-</div>
-
-<canvas id="canvas" tabindex="-1"></canvas>
-
-<div id="overlay">
-  <div id="box">
-    <h2 id="title">(0 / 42) Loading ...</h2>
-    <p id="message">Preparing game ...</p>
+  <div id="toolbar">
+    <button type="button" onclick="exportSave()">Export Save</button>
+    <button type="button" onclick="importSave()">Import Save</button>
   </div>
-</div>
 
-<div id="filesystem">Saving files...</div>
+  <canvas id="canvas" tabindex="-1"></canvas>
 
-<script>
-/* ---- Fixed Module bootstrap ---- */
-var Module = window.Module || {};
-Module.preRun  = Module.preRun  || [];
-Module.postRun = Module.postRun || [];
-Module.arguments = Module.arguments || [];
-Module.totalDependencies = Module.totalDependencies || 42;
-Module.doneDependencies  = Module.doneDependencies  || 0;
-Module.lastDependencies  = Module.lastDependencies  || 1;
+  <div id="overlay">
+    <div id="box">
+      <h2 id="title">(0 / 42) Loading ...</h2>
+      <p id="message">Preparing game ...</p>
+    </div>
+  </div>
 
-Module.print = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.log(e); };
-Module.printErr = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.error(e); };
-Module.canvas = (function(){
-  var e=document.getElementById("canvas");
-  e.addEventListener("webglcontextlost",function(t){ alert("WebGL context lost. You will need to reload the page."); t.preventDefault(); },false);
-  return e;
-})();
-Module.setStatus = function(e){
-  if(document.getElementById("canvas").style.display!=="none"){
-    var n=e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
-    if(n) e="("+n[2]+" / "+n[4]+") "+n[1];
-    document.getElementById("message").innerHTML=e;
-  }
-};
-Module.monitorRunDependencies = function(e){
-  if(e<Module.lastDependencies) Module.doneDependencies+=1;
-  Module.lastDependencies=e;
-  var total=Module.totalDependencies, doing=Module.doneDependencies+1;
-  if(doing>total) doing=total;
-  document.getElementById("title").innerHTML="("+doing+" / "+total+") Loading ...";
-  document.getElementById("message").innerHTML="Preparing game ...";
-};
-Module.onBootstrap = function(e,n){
-  document.getElementById("canvas").style.display="none";
-  document.getElementById("title").innerHTML="Missing base graphics";
-  document.getElementById("message").innerHTML="OpenTTD is downloading base graphics.<br/><br/>"+e+" / "+n+" bytes downloaded.";
-};
-Module.onBootstrapFailed = function(){
-  document.getElementById("canvas").style.display="none";
-  document.getElementById("title").innerHTML="Missing base graphics";
-  document.getElementById("message").innerHTML="Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again.";
-};
-Module.onBootstrapReload = function(){
-  document.getElementById("canvas").style.display="none";
-  document.getElementById("title").innerHTML="Missing base graphics";
-  document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game.";
-};
-Module.onExit = function(){
-  document.getElementById("canvas").style.display="none";
-  document.getElementById("title").innerHTML="Thank you for playing!";
-  document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game.";
-};
-Module.onAbort = function(){
-  document.getElementById("canvas").style.display="none";
-  document.getElementById("box").className="error";
-  document.getElementById("title").innerHTML="Crash :(";
-  document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game.";
-};
-Module.onWarningFs = function(){
-  document.getElementById("filesystem").style.display="inline-block";
-  document.getElementById("overlay").style.opacity = 1;
-  setTimeout(function(){
-    document.getElementById("overlay").style.opacity = 0;
-    setTimeout(function(){
-      document.getElementById("filesystem").style.display = "none";
-    }, 300);
-  }, 10000);
-};
-window.onerror=function(){ Module.onAbort(); };
-Module.locateFile = function (p) { return p; };
-</script>
+  <div id="filesystem">Saving files…</div>
 
-<script>
-async function exportSave() {
-  try {
-    const data = await FS.readFile('/.openttd/save/autosave.sav');
-    const blob = new Blob([data], { type: 'application/octet-stream' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'openttd_save.sav';
-    a.click();
-  } catch (e) {
-    alert('Export failed: ' + e.message);
-  }
-}
+  <!-- Fixed Module bootstrap (ensure this appears BEFORE openttd.js) -->
+  <script>
+    var Module = window.Module || {};
+    Module.preRun  = Module.preRun  || [];
+    Module.postRun = Module.postRun || [];
+    Module.arguments = Module.arguments || [];
+    Module.totalDependencies = Module.totalDependencies || 42;
+    Module.doneDependencies  = Module.doneDependencies  || 0;
+    Module.lastDependencies  = Module.lastDependencies  || 1;
 
-async function importSave() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.sav';
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const arrayBuffer = await file.arrayBuffer();
-    FS.writeFile('/.openttd/save/imported.sav', new Uint8Array(arrayBuffer));
-    alert('Save imported! Load it in-game via the "Load Game" menu.');
-  };
-  input.click();
-}
-</script>
+    Module.print = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.log(e); };
+    Module.printErr = function(e){ if(arguments.length>1) e=[...arguments].join(" "); console.error(e); };
 
-<!-- Load Emscripten build last -->
-<script src="openttd.js"></script>
+    Module.canvas = (function(){
+      var e=document.getElementById("canvas");
+      e.addEventListener("webglcontextlost",function(t){
+        alert("WebGL context lost. You will need to reload the page.");
+        t.preventDefault();
+      },false);
+      return e;
+    })();
+
+    Module.setStatus = function(e){
+      if(document.getElementById("canvas").style.display!=="none"){
+        var n=e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+        if(n) e="("+n[2]+" / "+n[4]+") "+n[1];
+        document.getElementById("message").innerHTML=e;
+      }
+    };
+
+    Module.monitorRunDependencies = function(e){
+      if(e<Module.lastDependencies) Module.doneDependencies+=1;
+      Module.lastDependencies=e;
+      var total=Module.totalDependencies, doing=Module.doneDependencies+1;
+      if(doing>total) doing=total;
+      document.getElementById("title").innerHTML="("+doing+" / "+total+") Loading ...";
+      document.getElementById("message").innerHTML="Preparing game ...";
+    };
+
+    Module.onBootstrap = function(e,n){
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("title").innerHTML="Missing base graphics";
+      document.getElementById("message").innerHTML="OpenTTD is downloading base graphics.<br/><br/>"+e+" / "+n+" bytes downloaded.";
+    };
+    Module.onBootstrapFailed = function(){
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("title").innerHTML="Missing base graphics";
+      document.getElementById("message").innerHTML="Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again.";
+    };
+    Module.onBootstrapReload = function(){
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("title").innerHTML="Missing base graphics";
+      document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game.";
+    };
+    Module.onExit = function(){
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("title").innerHTML="Thank you for playing!";
+      document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game.";
+    };
+    Module.onAbort = function(){
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("box").className="error";
+      document.getElementById("title").innerHTML="Crash :(";
+      document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game.";
+    };
+    Module.onWarningFs = function(){
+      document.getElementById("filesystem").style.display="inline-block";
+      document.getElementById("overlay").style.opacity = 1;
+      setTimeout(function(){
+        document.getElementById("overlay").style.opacity = 0;
+        setTimeout(function(){
+          document.getElementById("filesystem").style.display = "none";
+        }, 300);
+      }, 10000);
+    };
+
+    // Keep all generated file paths relative to this page
+    Module.locateFile = function (p) { return p; };
+
+    // Safety net
+    window.onerror=function(){ Module.onAbort(); };
+  </script>
+
+  <!-- Simple import/export helpers using Emscripten FS -->
+  <script>
+    async function exportSave() {
+      try {
+        // Choose a common path; change if your save has another name
+        const path = '/.openttd/save/autosave.sav';
+        const data = await FS.readFile(path);
+        const blob = new Blob([data], { type: 'application/octet-stream' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'openttd_save.sav';
+        a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href), 2000);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      }
+    }
+
+    async function importSave() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.sav,.scn';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const arrayBuffer = await file.arrayBuffer();
+        try {
+          // Ensure directory exists
+          try { FS.mkdir('/.openttd'); } catch {}
+          try { FS.mkdir('/.openttd/save'); } catch {}
+          FS.writeFile('/.openttd/save/imported.sav', new Uint8Array(arrayBuffer));
+          // Persist to IDBFS if mounted by the port
+          if (Module.FS && Module.FS.syncfs) {
+            Module.FS.syncfs(false, () => {});
+          }
+          alert('Save imported! Open “Load Game” in OpenTTD and select imported.sav');
+        } catch (err) {
+          alert('Import failed: ' + err.message);
+        }
+      };
+      input.click();
+    }
+  </script>
+
+  <!-- Load the Emscripten build last -->
+  <script src="openttd.js"></script>
+
+  <!-- Optional: Cloudflare Web Analytics (remove if not wanted) -->
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+          data-cf-beacon='{"token":"YOUR_CF_ANALYTICS_TOKEN"}'></script>
 </body>
 </html>
