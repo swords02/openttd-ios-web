@@ -52,7 +52,7 @@
   }
   #toolbar button{
     color:#eee;background:#222;border:1px solid #444;border-radius:6px;
-    padding:6px 10px;margin:0 4px 0 0;cursor:pointer
+    padding:6px 10px;margin:0 4px 6px 0;cursor:pointer
   }
   #toolbar button:hover{background:#2b2b2b}
 
@@ -106,6 +106,8 @@
     <button type="button" onclick="importSave()">Import Save</button>
     <button type="button" onclick="exportScenario()">Export Scenario</button>
     <button type="button" onclick="importScenario()">Import Scenario</button>
+    <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
+    <button type="button" onclick="importHeightmap()">Import Heightmap</button>
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -123,6 +125,7 @@
   <script>
     const SAVE_DIR = '/home/web_user/.openttd/save/';
     const SCEN_DIR = '/home/web_user/.openttd/scenario/';
+    const HEIGHT_DIR = '/home/web_user/.openttd/heightmap/'; // NEW: heightmaps
 
     const toolbar = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
@@ -162,9 +165,14 @@
       const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
       let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
     }
-    function newestByMtime(dir, ext){
+    function newestByMtime(dir, exts){
       try{
-        const items = FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'&&f.toLowerCase().endsWith(ext));
+        const items = FS.readdir(dir)
+          .filter(f=>f!=='.'&&f!=='..')
+          .filter(f=>{
+            const low=f.toLowerCase();
+            return (Array.isArray(exts)? exts : [exts]).some(ext=>low.endsWith(ext));
+          });
         if(!items.length) return null;
         let best = items[0], t = 0;
         for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
@@ -240,10 +248,10 @@
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
-    /* ---- Import/Export ---- */
+    /* ---- Import/Export: Saves ---- */
     async function exportSave(){
       try{
-        const name=newestByMtime(SAVE_DIR,'.sav');
+        const name=newestByMtime(SAVE_DIR,['.sav']);
         if(!name){alert('No .sav found in '+SAVE_DIR);return;}
         const data=FS.readFile(SAVE_DIR+name);
         const a=document.createElement('a');
@@ -266,9 +274,11 @@
       };
       input.click();
     }
+
+    /* ---- Import/Export: Scenarios ---- */
     async function exportScenario(){
       try{
-        const name=newestByMtime(SCEN_DIR,'.scn');
+        const name=newestByMtime(SCEN_DIR,['.scn']);
         if(!name){alert('No .scn found in '+SCEN_DIR);return;}
         const data=FS.readFile(SCEN_DIR+name);
         const a=document.createElement('a');
@@ -287,6 +297,37 @@
           FS.writeFile(SCEN_DIR+f.name,new Uint8Array(buf));
           if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
           alert('Imported scenario to '+SCEN_DIR+f.name);
+        }catch(err){alert('Import failed: '+err.message);}
+      };
+      input.click();
+    }
+
+    /* ---- Import/Export: Heightmaps (PNG/BMP) ---- */
+    async function exportHeightmap(){
+      try{
+        const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
+        if(!name){alert('No heightmap (.png or .bmp) found in '+HEIGHT_DIR);return;}
+        const data=FS.readFile(HEIGHT_DIR+name);
+        const a=document.createElement('a');
+        // Try to preserve content-type by extension (optional)
+        const type = name.toLowerCase().endsWith('.png') ? 'image/png'
+                   : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
+                   : 'application/octet-stream';
+        a.href=URL.createObjectURL(new Blob([data],{type}));
+        a.download=name; a.click();
+        setTimeout(()=>URL.revokeObjectURL(a.href),100);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importHeightmap(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp';
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f)return;
+        const buf=await f.arrayBuffer();
+        try{
+          mkdirp(HEIGHT_DIR);
+          FS.writeFile(HEIGHT_DIR+f.name,new Uint8Array(buf));
+          if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
+          alert('Imported heightmap to '+HEIGHT_DIR+f.name+'\n\nLoad it from: Main menu → Scenario Editor → Heightmap.');
         }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
