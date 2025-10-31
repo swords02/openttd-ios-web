@@ -1,5 +1,3 @@
-Join the open test: https://testflight.apple.com/join/sMZ7a4bm
-
 How to play: https://wiki.openttd.org/en/Manual/Tutorial/
 
 Disclaimer: This is an unofficial fan-made port of the open-source project OpenTTD.
@@ -7,8 +5,6 @@ It is not affiliated with or endorsed by the official OpenTTD team or its develo
 
 Open Transport Simulator, or OpenTTD, is a simulation game based upon the popular Microprose game "Transport Tycoon Deluxe", written by Chris Sawyer. It attempts to mimic the original game as closely as possible while adding new features!
 
-- Joystick map control: adapted UI to support mobile touch.
-- Pinch-to-zoom gesture: Use familiar multitouch gestures to smoothly zoom in and out of your transport networks.
 - Responsive WebView experience: Runs directly in a WebView using open web technology — no extra downloads or accounts required.
 - Open-source content: Includes OpenGFX, OpenSFX, and OpenMSX assets under GPLv2, ensuring a completely free and transparent gameplay experience.
 - Community extensions: Supports NewGRF content and other open add-ons directly from the official OpenTTD servers.
