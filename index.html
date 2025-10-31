@@ -4,7 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD Online</title>
-<meta name="description" content="Play OpenTTD online in your browser. Build and manage your transport empire — no downloads required.">
+<meta name="description" content="Play OpenTTD Online instantly in your web browser — no downloads required. Experience the full open-source transport tycoon simulator with trains, planes, ships, and road vehicles, all playable directly online. Build your transport empire anywhere, anytime.">
+
+<meta name="keywords" content="OpenTTD online, play OpenTTD in browser, OpenTTD web version, OpenTTD WebAssembly, Transport Tycoon online, open source transport game, transport tycoon browser, online simulation game, web transport tycoon, OpenTTD for Chrome, OpenTTD Web Build">
+
+<meta name="author" content="overgrown-games.com">
+<meta property="og:title" content="OpenTTD Online – Play in Your Browser">
+<meta property="og:description" content="Play the full OpenTTD transport tycoon simulator directly in your web browser. Build, manage, and expand your transport empire online.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://openttdonline.com/">
 
 <!-- CSP: allow OpenTTD endpoints (HTTP/S + WSS). -->
 <meta http-equiv="Content-Security-Policy"
@@ -72,6 +80,10 @@
   #logo{
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
     max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease
+  }
+
+  html, body, canvas, #canvas, * {
+  cursor: none !important;
   }
 </style>
 </head>
