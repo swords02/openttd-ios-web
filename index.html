@@ -4,15 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD Online</title>
-<meta name="description" content="Play OpenTTD online in your browser. Build and manage your transport empire—no downloads required.">
-<meta name="keywords" content="OpenTTD online, play OpenTTD in browser, transport tycoon web, OpenTTD WebAssembly">
+<meta name="description" content="Play OpenTTD online in your browser. Build and manage your transport empire — no downloads required.">
 
 <!-- CSP: allow OpenTTD endpoints (HTTP/S + WSS). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
         script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';
-        script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
         font-src 'self' data:;
@@ -35,18 +33,56 @@
 <style>
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
   #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
-  #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .25s;pointer-events:none;z-index:2}
+  #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
   #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
-  #toolbar{position:fixed;top:10px;left:10px;z-index:3;background:rgba(0,0,0,.55);border:1px solid #333;border-radius:8px;padding:6px 10px;backdrop-filter:blur(2px)}
-  #toolbar button{color:#eee;background:#222;border:1px solid #444;border-radius:6px;padding:6px 10px;margin:0 4px 0 0;cursor:pointer}
+  /* Toolbar sits below the toggle button (54px) so they don't overlap */
+  #toolbar{
+    position:fixed;top:54px;left:10px;z-index:3;
+    background:rgba(0,0,0,.55);border:1px solid #333;border-radius:8px;
+    padding:6px 10px;backdrop-filter:blur(2px);
+    display:none
+  }
+  #toolbar button{
+    color:#eee;background:#222;border:1px solid #444;border-radius:6px;
+    padding:6px 10px;margin:0 4px 0 0;cursor:pointer
+  }
   #toolbar button:hover{background:#2b2b2b}
-  #filesystem{display:none;position:fixed;bottom:10px;right:10px;background:rgba(0,0,0,.6);padding:8px 10px;border-radius:8px;color:#fff;font-size:13px;border:1px solid #333;z-index:3}
+
+  /* On-screen toggle button (always available, tiny footprint) */
+  #toolbar-toggle{
+    position:fixed;top:10px;left:10px;z-index:4;
+    width:38px;height:38px;border-radius:9999px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
+    cursor:pointer;user-select:none;backdrop-filter:blur(2px)
+  }
+  #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
+  #toolbar-toggle .icon{font-size:18px;line-height:1}
+  #toolbar-toggle[aria-pressed="true"]{outline:2px solid #4caf50;outline-offset:1px}
+
+  #filesystem{
+    display:none;position:fixed;bottom:10px;right:10px;
+    background:rgba(0,0,0,.6);padding:8px 10px;border-radius:8px;
+    color:#fff;font-size:13px;border:1px solid #333;z-index:3
+  }
   .error{color:#ff6b6b}
+
+  /* Centered loading logo */
+  #logo{
+    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+    max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease
+  }
 </style>
 </head>
 
 <body>
+  <!-- On-screen toggle button -->
+  <button id="toolbar-toggle" type="button" aria-label="Toggle tools" aria-pressed="false" title="Tools">
+    <span class="icon">☰</span>
+  </button>
+
+  <!-- Hidden toolbar (toggled by the button above) -->
   <div id="toolbar">
     <button type="button" onclick="exportSave()">Export Save</button>
     <button type="button" onclick="importSave()">Import Save</button>
@@ -63,151 +99,177 @@
     </div>
   </div>
 
+  <img id="logo" src="overgrown.png" alt="Overgrown logo">
   <div id="filesystem">Saving files…</div>
 
-  <!-- Module bootstrap (BEFORE openttd.js) -->
   <script>
     const SAVE_DIR = '/home/web_user/.openttd/save/';
     const SCEN_DIR = '/home/web_user/.openttd/scenario/';
 
-    function showGameUI(){ const ov=document.getElementById('overlay'); ov.style.opacity=0; setTimeout(()=>{ov.style.display='none';},250); document.getElementById('canvas').style.display='block'; }
-    function showOverlay(title,msg){ const ov=document.getElementById('overlay'); ov.style.display='flex'; ov.style.opacity=1; if(title)document.getElementById('title').textContent=title; if(msg)document.getElementById('message').innerHTML=msg; }
+    const toolbar = document.getElementById('toolbar');
+    const toggleBtn = document.getElementById('toolbar-toggle');
+    const logo = document.getElementById('logo');
+
+    // Toggle toolbar visibility (and persist choice)
+    const TOOLBAR_KEY = 'openttd_toolbar_visible';
+    function setToolbar(visible){
+      toolbar.style.display = visible ? 'block' : 'none';
+      toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      try{ localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); }catch(_){}
+    }
+    toggleBtn.addEventListener('click', ()=>{
+      const next = toolbar.style.display !== 'block';
+      setToolbar(next);
+    });
+    // Restore persisted state (default hidden)
+    try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1'); }catch(_){ setToolbar(false); }
+
+    /* ---- Overlay + Logo helpers ---- */
+    function showGameUI(){
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=0;
+      setTimeout(()=>{ov.style.display='none';},400);
+      logo.style.opacity=0;
+      setTimeout(()=>logo.style.display='none',600);
+    }
+    function showOverlay(title,msg){
+      const ov=document.getElementById('overlay');
+      ov.style.display='flex'; ov.style.opacity=1;
+      if(title)document.getElementById('title').textContent=title;
+      if(msg)document.getElementById('message').innerHTML=msg;
+      logo.style.opacity=1; // show logo while loading/overlay
+    }
 
     function mkdirp(path){
       const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
-      let cur=''; for(const p of parts){ cur += '/' + p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
+      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
     }
     function newestByMtime(dir, ext){
       try{
         const items = FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'&&f.toLowerCase().endsWith(ext));
         if(!items.length) return null;
-        let best=items[0], t=0; for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
+        let best = items[0], t = 0;
+        for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
         return best;
       }catch(_){ return null; }
     }
 
+    /* ---- Emscripten Module ---- */
     var Module = window.Module || {};
-    Module.preRun  = Module.preRun  || [];
-    Module.postRun = Module.postRun || [];
-    Module.arguments = Module.arguments || [];
-    Module.totalDependencies = Module.totalDependencies || 42;
-    Module.doneDependencies  = Module.doneDependencies  || 0;
-    Module.lastDependencies  = Module.lastDependencies  || 1;
+    Module.preRun=[]; Module.postRun=[]; Module.arguments=[];
+    Module.totalDependencies=42; Module.doneDependencies=0; Module.lastDependencies=1;
 
-    Module.print = function(){ console.log([].slice.call(arguments).join(' ')); };
-    Module.printErr = function(){ console.error([].slice.call(arguments).join(' ')); };
+    Module.print = (...a)=>console.log(a.join(' '));
+    Module.printErr = (...a)=>console.error(a.join(' '));
 
-    Module.canvas = (function(){
+    Module.canvas = (()=>{
       var e=document.getElementById("canvas");
-      e.addEventListener("webglcontextlost",function(t){ alert("WebGL context lost. Reload the page."); t.preventDefault(); },false);
+      e.addEventListener("webglcontextlost",ev=>{
+        alert("WebGL context lost. Reload the page."); ev.preventDefault();
+      },false);
       return e;
     })();
 
     Module.setStatus = function(e){
-      var n=e && e.match && e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
-      if(n) e="("+n[2]+" / "+n[4]+") "+n[1];
+      const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+      if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`;
       document.getElementById("message").innerHTML = e || '';
       if(e==='Running...') showGameUI();
     };
-
     Module.monitorRunDependencies = function(e){
-      if(e<Module.lastDependencies) Module.doneDependencies+=1;
+      if(e<Module.lastDependencies) Module.doneDependencies++;
       Module.lastDependencies=e;
-      var total=Module.totalDependencies, doing=Module.doneDependencies+1;
-      if(doing>total) doing=total;
-      document.getElementById("title").textContent="("+doing+" / "+total+") Loading ...";
-      document.getElementById("message").textContent="Preparing game ...";
+      const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total);
+      document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`;
+      document.getElementById("message").textContent = "Preparing game ...";
     };
 
-    Module.onBootstrap = function(bytes,total){
+    Module.onBootstrap=(bytes,total)=>{
       document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics","OpenTTD is downloading base graphics.<br/><br/>"+bytes+" / "+total+" bytes downloaded.");
+      showOverlay("Missing base graphics",`OpenTTD is downloading base graphics.<br><br>${bytes} / ${total} bytes downloaded.`);
     };
-    Module.onBootstrapFailed = function(){
+    Module.onBootstrapFailed=()=>{
       document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics","Failed to download base graphics.<br/>The game cannot start without them.<br/><br/>Check your connection and console log. Reload to try again.");
+      showOverlay("Missing base graphics","Failed to download base graphics.<br>The game cannot start without them.<br><br>Check your connection and reload.");
     };
-    Module.onBootstrapReload = function(){
+    Module.onBootstrapReload=()=>{
       document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics","Downloading complete.<br/><br/>Your browser will reload to start the game.");
+      showOverlay("Missing base graphics","Download complete.<br>Your browser will reload shortly.");
     };
-    Module.onExit = function(){
+    Module.onExit=()=>{
       document.getElementById("canvas").style.display="none";
-      document.getElementById("box").classList.remove('error');
-      showOverlay("Thank you for playing!","Reload your browser to restart the game.");
+      showOverlay("Thank you for playing!","Reload your browser to restart.");
     };
-    Module.onAbort = function(){
+    Module.onAbort=()=>{
       document.getElementById("canvas").style.display="none";
       document.getElementById("box").className="error";
-      showOverlay("Crash :(","The game crashed!<br/><br/>Reload your browser to restart the game.");
+      showOverlay("Crash :(","The game crashed! Reload to restart.");
     };
 
-    /* The port calls this during IDBFS sync warnings (quota, slow write, etc).
-       Define BOTH dot and bracket properties so minified code always finds it. */
-    function _onWarningFsImpl(){
+    // FS warning hook (define both, to support bracket/dot access after minification)
+    const _onWarningFsImpl=()=>{
       const fsEl=document.getElementById('filesystem');
       fsEl.style.display='inline-block';
       const ov=document.getElementById('overlay');
       ov.style.opacity=1;
-      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>{ fsEl.style.display='none'; },300); }, 3000);
-    }
-    Module.onWarningFs = _onWarningFsImpl;
-    Module['onWarningFs'] = _onWarningFsImpl;
+      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
+    };
+    Module.onWarningFs=_onWarningFsImpl;
+    Module['onWarningFs']=_onWarningFsImpl;
 
-    Module.onRuntimeInitialized = function(){ showGameUI(); };
+    Module.onRuntimeInitialized=()=>showGameUI();
     Module.postRun.push(showGameUI);
+    Module.locateFile=p=>p;
+    window.onerror=()=>Module.onAbort();
 
-    Module.locateFile = function (p) { return p; };
-    window.onerror=function(){ Module.onAbort(); };
-
-    /* ---- Import/Export UI ---- */
+    /* ---- Import/Export ---- */
     async function exportSave(){
       try{
-        const name = newestByMtime(SAVE_DIR, '.sav');
-        if(!name){ alert('No .sav files found in '+SAVE_DIR); return; }
-        const data = FS.readFile(SAVE_DIR+name);
+        const name=newestByMtime(SAVE_DIR,'.sav');
+        if(!name){alert('No .sav found in '+SAVE_DIR);return;}
+        const data=FS.readFile(SAVE_DIR+name);
         const a=document.createElement('a');
         a.href=URL.createObjectURL(new Blob([data],{type:'application/octet-stream'}));
         a.download=name; a.click();
         setTimeout(()=>URL.revokeObjectURL(a.href),100);
-      }catch(e){ alert('Export failed: '+e.message); }
+      }catch(e){alert('Export failed: '+e.message);}
     }
     async function importSave(){
       const input=document.createElement('input'); input.type='file'; input.accept='.sav';
       input.onchange=async e=>{
-        const f=e.target.files[0]; if(!f) return;
+        const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
           mkdirp(SAVE_DIR);
           FS.writeFile(SAVE_DIR+f.name,new Uint8Array(buf));
-          if(Module.FS && Module.FS.syncfs){ Module.FS.syncfs(false,()=>{}); }
-          alert('Imported to '+SAVE_DIR+f.name+'\nOpen “Load Game” to pick it.');
-        }catch(err){ alert('Import failed: '+err.message); }
+          if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
+          alert('Imported to '+SAVE_DIR+f.name);
+        }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
     }
     async function exportScenario(){
       try{
-        const name = newestByMtime(SCEN_DIR, '.scn');
-        if(!name){ alert('No .scn files found in '+SCEN_DIR); return; }
-        const data = FS.readFile(SCEN_DIR+name);
+        const name=newestByMtime(SCEN_DIR,'.scn');
+        if(!name){alert('No .scn found in '+SCEN_DIR);return;}
+        const data=FS.readFile(SCEN_DIR+name);
         const a=document.createElement('a');
         a.href=URL.createObjectURL(new Blob([data],{type:'application/octet-stream'}));
         a.download=name; a.click();
         setTimeout(()=>URL.revokeObjectURL(a.href),100);
-      }catch(e){ alert('Export failed: '+e.message); }
+      }catch(e){alert('Export failed: '+e.message);}
     }
     async function importScenario(){
       const input=document.createElement('input'); input.type='file'; input.accept='.scn';
       input.onchange=async e=>{
-        const f=e.target.files[0]; if(!f) return;
+        const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
           mkdirp(SCEN_DIR);
           FS.writeFile(SCEN_DIR+f.name,new Uint8Array(buf));
-          if(Module.FS && Module.FS.syncfs){ Module.FS.syncfs(false,()=>{}); }
-          alert('Imported scenario to '+SCEN_DIR+f.name+'\nOpen “Play Scenario” inside OpenTTD.');
-        }catch(err){ alert('Import failed: '+err.message); }
+          if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
+          alert('Imported scenario to '+SCEN_DIR+f.name);
+        }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
     }
