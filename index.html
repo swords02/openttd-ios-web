@@ -43,18 +43,32 @@
   #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
 
-  /* Toolbar sits below the toggle button (54px) so they don't overlap */
+  /* Compact vertical toolbar */
   #toolbar{
-    position:fixed;top:54px;left:10px;z-index:3;
-    background:rgba(0,0,0,.55);border:1px solid #333;border-radius:8px;
-    padding:8px 10px;backdrop-filter:blur(2px);
+    position:fixed;
+    top:54px;left:10px;z-index:3;
+    background:rgba(0,0,0,.55);
+    border:1px solid #333;
+    border-radius:8px;
+    padding:6px 8px;
+    backdrop-filter:blur(2px);
     display:none;
-    display:flex;flex-direction:column;gap:6px; /* vertical stack */
-    min-width:220px;
+    display:flex;
+    flex-direction:column;
+    gap:4px;              /* small gap between buttons */
+    min-width:160px;      /* narrower width for smoother look */
   }
   #toolbar button{
-    color:#eee;background:#222;border:1px solid #444;border-radius:6px;
-    padding:8px 10px;cursor:pointer;width:100%;text-align:left;
+    color:#eee;
+    background:#222;
+    border:1px solid #444;
+    border-radius:6px;
+    padding:6px 8px;
+    cursor:pointer;
+    width:100%;
+    text-align:left;
+    font-size:13px;
+    transition:background .15s;
   }
   #toolbar button:hover{background:#2b2b2b}
 
@@ -127,13 +141,13 @@
   <script>
     const SAVE_DIR   = '/home/web_user/.openttd/save/';
     const SCEN_DIR   = '/home/web_user/.openttd/scenario/';
-    const HEIGHT_DIR = '/home/web_user/.openttd/scenario/heightmap/'; // UPDATED
+    const HEIGHT_DIR = '/home/web_user/.openttd/scenario/heightmap/';
 
     const toolbar = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
     const logo = document.getElementById('logo');
 
-    // Toggle toolbar visibility (and persist choice)
+    // Toolbar toggle + persistence
     const TOOLBAR_KEY = 'openttd_toolbar_visible';
     function setToolbar(visible){
       toolbar.style.display = visible ? 'block' : 'none';
@@ -144,10 +158,9 @@
       const next = toolbar.style.display !== 'block';
       setToolbar(next);
     });
-    // Restore persisted state (default hidden)
     try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1'); }catch(_){ setToolbar(false); }
 
-    /* ---- Overlay + Logo helpers ---- */
+    // Overlay + logo controls
     function showGameUI(){
       const ov=document.getElementById('overlay');
       ov.style.opacity=0;
@@ -160,7 +173,7 @@
       ov.style.display='flex'; ov.style.opacity=1;
       if(title)document.getElementById('title').textContent=title;
       if(msg)document.getElementById('message').innerHTML=msg;
-      logo.style.opacity=1; // show logo while loading/overlay
+      logo.style.opacity=1;
     }
 
     function mkdirp(path){
@@ -182,7 +195,6 @@
       }catch(_){ return null; }
     }
 
-    /* ---- Emscripten Module ---- */
     var Module = window.Module || {};
     Module.preRun=[]; Module.postRun=[]; Module.arguments=[];
     Module.totalDependencies=42; Module.doneDependencies=0; Module.lastDependencies=1;
@@ -234,7 +246,6 @@
       showOverlay("Crash :(","The game crashed! Reload to restart.");
     };
 
-    // FS warning hook
     const _onWarningFsImpl=()=>{
       const fsEl=document.getElementById('filesystem');
       fsEl.style.display='inline-block';
@@ -243,14 +254,13 @@
       setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
     };
     Module.onWarningFs=_onWarningFsImpl;
-    Module['onWarningFs']=_onWarningFsImpl;
 
     Module.onRuntimeInitialized=()=>showGameUI();
     Module.postRun.push(showGameUI);
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
-    /* ---- Import/Export: Saves ---- */
+    /* Import/Export: Saves */
     async function exportSave(){
       try{
         const name=newestByMtime(SAVE_DIR,['.sav']);
@@ -277,7 +287,7 @@
       input.click();
     }
 
-    /* ---- Import/Export: Scenarios ---- */
+    /* Import/Export: Scenarios */
     async function exportScenario(){
       try{
         const name=newestByMtime(SCEN_DIR,['.scn']);
@@ -304,7 +314,7 @@
       input.click();
     }
 
-    /* ---- Import/Export: Heightmaps (PNG/BMP) ---- */
+    /* Import/Export: Heightmaps */
     async function exportHeightmap(){
       try{
         const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
