@@ -1,31 +1,448 @@
-<!doctype html><html lang=en-us><head><meta charset=utf-8><meta content="text/html; charset=utf-8" http-equiv=Content-Type><title>OpenTTD</title><style>
-body{font-family:Tahoma,Arial,Helvetica,sans-serif;font-size:14px;margin:0;padding:0}
-div.background{background-image:url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEEAAAAhCAIAAAAJYVFIAAASn0lEQVRYw02Xx45lR4JYw0dcf+/zL01ZkkWiOTJQYzYCJAGj/98IkIZsNlnMrHTPXG/ChxbczPmDsznAgT//7w9P9uHH/d+k+DXWP7zIX31wyXSkhxPAzr4c86Ji+wdX307kj3bQO/q9Fg/d9SYunzN3L+m3bpJr/JmhCK+/dY8ipLXvCpT3MbxZmhDKF9/n+VHWzQqxSwY3ltTErojPcPnqZYrE6GW6uKZXXRrupB/jaordcbFDpxpCQAZvRik9q+lSLsYaOnJVlGsk8bCcE6Yz/P2/vtulh6Eeete7jsbrUUQhTFlK7ixpUdYxvxrtBduyntot+3zRD2l4J8G3HN5r/s2cCw10TArFH+C8tyNKt9rNPDBJYRays23TGfW6iVnSgDFxtOFhy4vxOoZFj91IMbckcKK3mCmKOGaamJUOo+qBUTjGW0ilXzwGBHhkvc/5Os6BnJy/rB2WLMP4/b/syf4Pw69SBaqzMOSDG9fpLT88zo+rBN2/6X/m4eNZfWXTyudPpF+77Fk54zoKozks0fbeE58b2MsaTOTC3RGktW2z1lwgX6TZRJnSpANdmUbrdGObgS5mNJpjokR6YXqDTI7L1171KnR+iHkqOc4D1THP4txSGIkcCpqKDB7WK2V0X6thMibo7Y4kCcfFMdakti83hkzRtg9TynTeoD8j9bGF3xJS4qRhvsJxm/K98HtfPA3N/eHGuokPZla070ctQNXLgRRdRd9b9srsAaQNmjPMHJEY86Uk9wvqbfSC5S6BOWQdnAOmKgI3FvUAAmUX30dKQpT1tkuwkH4h7TACF3u0eM1ULWbTDJ06X+dbNd6Ujn9wDFbzKcK3/2O2z0dyfF3jL9ep2X1S6WH55z/kZTn9zxH/Qc+h2Se3Z/lcRcfLDJ/N64avXnb0y9k806nkqrJkuamOUHTdqAWokkqXYqN838sMc5mJ1aAkATGN59gfic9w9aJqJvA63VgUuA0SBe6hcgrxyMI5i/CGgopVM7aEmIKjUg+gD29eEyTT9Y3nn4HBe9jfBRP5+Io32ztyfEn0j/111KS3LztDutzcfPwJPE6bt2mIYVrLXpL+VvwNLbsafMvhB599i+1NyE+wqLX1rGjpchfaLN5fwLQz/BXJLRbnSc48VDSede8DlhSmtXrF0RyRNS0bL7PF1aqluiWBTcESSGywxPO6C09hKZXXz9OjHDRymGUyy5IkWlk0XbshkHldxg4NYyfx9nOJs2E50yl+uX9PdR2n5N5XD8qolN5s02NHHsW8aeZR4Izuvo3zYltqUE980Uw9qNdr8W5+E3Ov0eaN6KPEL2DeQhtb3ObwjoKkXdogCZhyF53REvtgUEiUnYDjHsrJJDgfwMKQkBFdoUhxVPQdQIDGqY18nIttfrcImiJdofxCIceAEZ/asWjnTkmPf/jX95Zeqzudmu/DuLHl1/mCfZ8NbkrwCkE8uqumfekPdvHLRWhz4LuXUK/ifZ2C+5CdDH8dVcXWp0kpAapAxlqeKEhsExvxQpDAYp5Rm8YrxKWgxaQ0BhEkEgUxLJLElwztso1jsNRgID7t5WhQhzQFSKeHxakQgOkVnXxteivNzIjwwMLim4WSghxv/t6YpwNzNzP/hfrVZboq2otNH8WB+83Mf2PCrOAPcZQl799ad3XoqrXTZLoRP3lD5guJwQ3JnyCRevwwutcMHAt8y9fnLpxify9WrbxEqK9CchJha0gt3cBh+ZcDYdJ3qUM9tDkyea/6pbN4SQJ0SZJl+KitwkiMiyOBrCokeMTcgSbz5Ot5tjHYEeLxdz/+yxX9kdJ1sh7DUlbHabh8wG0S+ryGD0v/XpqxOPRQ5e0j2dzZInzM0fGtrSlIpm4e2HN2bPRb1UvtXZYWUxDnpQlIbRc3e3Eiy7F3bX7X+65ALvNsSOFx1DX1VaAt8eUSlqhSp7YZG+OhTpP8hngDR0AShqJBDShtPZJ9H2mvHTnBgJHccLcx1nuLYrDD67/XXHhmt6M9Ubd+qt8O0SasHlDRahMCbpJ5z90NBMSVf87fSh0/yRrsi1s1qDiLJejMWznRxiOdlS2sV5CaRGyNeAJDkoJ3fHP1fWScjlhlxNtG3GGXBd5QGHkkURBNN3fTkph14IpYka6kjZJTb+Vg41VvyQCnHRm2NGpSliDAYcAW9wFJYz0ECLIB7/8zds/HGv5ZgS9s99Bd3qWM1fOlDD/APo5W4wT7mFRS/NO8rdDm4i8btLmoDnoLXfF4eY5d3EFionlX7WBE1+0yMZAGMoK0ozAD81pPAYiRwrSfZ5BcoGPdOBt69l3qcOfZLOSa55IXM9SRDRoBESU2TRPTZK6N49UkxQm7dQTWDo8w4AA9BCjNkApw1hb/9L8SFg452b2oX5rTu2PGF/Hvi7Ip3vjqwb5tNV5SsnKk9VME4znle3NN4Pr0Ol+N8xUqA5PpN49wIrvkoXvcxLfprpGnWNh7gsTC/gjZGRJLXSntTPWO+HRxne+zZhnSzq3ZuwCEHfmsbSxyItzSW2q2QXSEI5LP0MexfTe7xmfPCS6NVwhQD6yzKHabtNC4/NGfrxUsfhGRX9P9wn9pz5+yqhdhZXCDso60B599i+yn9L6Wz1V0uHBSqUsMxJKo7erTBLtyLHRRbid6Snw5gzMx+xHU0e6KfWzAaC8lxN7yi7La9lRPFinRmGZb7BGp0LYBxdlpbIPlNErzMKMWBC61AZ5GYUezEWILsDEdlWaeQ9ctI/V5mgGpu2la8Oeffsblr4n6ch2bFK+v8zXgywr8sPDf7pq4rzdo/2bPW06T2Z9juofLZqa/D+CaZB7JVF6SkZ09Mvlugm2Fy4YsJccpXLiBo6ZnYe5A2iWVfXmxuN+wEAEA8vd9upZxNVuJmmGxbZqyzerGUcxnNbs+inJt8GBRRxAhLACPsdpGKxU0Wkac8xUT1lkEUSCUY3K/3t7MYK5Qcl3ORJMxmY++eEjM99f0lPA9d/sGPcakaOY2QqUUvwv9bjFTDj4O8Fykq5IdyJ+DYSqK9r2cgWIhffUa+T73fa4nH6HNw2sPkNkUO0nbmV6YOwhzp+zc+6agR15ITDDhdmqN9TKOcmJ2cRakrBDXdvCTHEz8BGQ+awfjDmk8ThZBRojvF4A//Pd2+mObvHs5PX0Qu8c1/uLLx8R8DwOJV2OQBdk8JPa9ZF8XrRO8buYu3XWZfy/ZozQSRDUDeZsMKLa6oTrMmvVoWJV3ciJ1UAwF8jQ/7LNjVjoGYmkXG3SYiOOnwCY8rDko4kqhIGY1Db4WYR/oWC9GGpkSBoDqXc3ANvXvaTYB44PFwCPKgoiY6zKIO7zZ3U/xi3nZxrsH93pwxZ+J+Z5uH5/eYgcv1yZLignInJodjlvqSxx3ZHy30AdzKjXQJfyk2TfY54ibIIVBcivek7KZTzEaKiWaPC932Y2eTK97M0Keyii1UMUROEJiQNJSHCu7AMfGRcVwK/2IXRrAwkEC6fzXRTAqAm+8pm7MeKYxws47QhkSi9UBJ19u83Uzhh7Xx7Kqks30/Jo6dNFTyeJWpFc6foSe4u2fl1oGcXWnbXy8MnnvslOJ3/HNmaqb+NAzcxsfhtv802l61nV8kQ2BZH8PKExxcXbJm7IG6xhM+ax1Eq/iTataxuRd767E5ZPp/YSRGKCmgA4KDXYkAGngcFGhOBLWGzmayQ0IJJh5p8Mwasta53N89zHG6bCGPzXoAaZvZPguY9SSCx4oTqbE/DCz34nPZ3tFzXYykq97+bQW+4t8LWv7wvWNpN/QfBivRsKmfXWnvv9Pao4OPn1v0XwznJ0Eta1L4zyteuQYkfkULsiUCxgxJiz6a99UHKUROIK4m2Sa54IDNM52wf2oJLSp1taKpozWiGoEKGYQ+oA9w96jYl10PQwAFAVI9U8wYLL7w73t8qIqywgiCP4DWQ7C6ZBmVWg+lh+m3K+Rp7H+bqrtwF70pQyaff99NPw3hvgncPkh6Ahvz77PUTrusoNb0vi23/x8mfTy68vv96cBjY/jmUDWh5lBOuj8/6kORbQrSREIQp6l4x01SRrxqqTeA6VAFNFVmUSCKsQNYiIR+N3Pe5xelhNF6cj85kX9kuaAgyPdPdr6biL/NK8bNTqQDGGOYTyHObb5t1q9Mnnfg9O37gnMCAYkqimLt3GUyVCfr4soplW8HuGDPEco72N0XFqwhN5cM+N05Iv7d7zHxfNocKCz1hPs1uI+Mve9axgscLwwKLDQoDxZaFA0sVDAbsuygUBhvAKBYGhkuEKT4vc/H8/jmeo0DLkrv+LmYGlP3Xq0J2org5tRbvjuOVw2aHNJ3KdQvMb2w1vdZ7xkWZ/IbZGvs/dXZm6hE3j9jag9ZpIsRz2z61QHRXGk1AAnVG9uPNYR9wdUtAoMHK038Y1mHVJsnjwEjJetDJ1qsfELBHxajG6jAt6HIR+vNqRXihPjlbcYqZVDo8B5DLb4/ucdTi9D6DfZraV1xm+vc5OglSU1davr1KTlJbXfpfc1W94v9KvQ70/yATMDRgqjubiV0wXSVJ3ryPKH5SXW/E34G03eaHVelM74DnKZ7ucc36LpYOOLHLVt0lkbihKK+OJ7idsEFEiypSFy3pJyRIqwWGcix0Kb+Gm2HCSLRT00GSauM2fvEJwyHVrIDf78b8v0x5aqwlVfE/NlZr9K5VK8+csBxY1727v0G57eQc+u89V0mKrMkqXKdlE4zLaJ6ObcdyXN87XhuGJuT6u3Zpy0tgX4YNlJX2Oy3Cr2ggLu52WGLa36KLMcFpq8IdGX+D7l2+Smm+lZgatxSkFZiRvuq7mBRG94OkLe2GU/acUAr/CHqJgX9gJNmWYI3378coVfD9+p+c8dZ5GhlxX88qZ+K8J3C/891p9a+LTe4X98ew0jsmReZftbOHZwEaTCkNRznWzbWZp+zD1sDTlhn4J5HYPtICcKEuF3A7xQwtLCQh9nlTVy6+sK9GnvLuNSSgmiqqVIjC8iyVwVHXJwP0zSGmhmN4Q3truCORpapB2LYkeSsxxVmFbGAUNP2CX4878t7mVrSJfx21n8cif+q1YBxhfmVwY31FXP9WVeTGlvVHwVcpPeXiXcPzUtmFFye571wuePsE9F9ZKAuwAV9qmijyiwxU4cJYY/YTHxUC5ugFZcujHBMatqUFxMsB4MQmeRuUUgcunr0mIderksBd0hhwkhnilZM2mVoVOUTlSJYEkUJ4HPTplYv4tKg+zbJxDQX+nsetCy/+Oh7Xsw0H83r5uJ/JYVPl2OdHfJVxYj0A/KuXB7i9e7fPi6ZvUtXb0u+SO399hH/zHEhwMbbFA2uPP2NLxCuWHFANEKuHQaAZ7epdPHgkcuuxoyS/qoOoyE9FIgIWU4a6klfep709vF0ImrMidluUp94EoCAAAqOpgNfljj9d9rmHcABua2o70m8jsI8OguuN6/6uebmuX590Z5PySjnav0EFi/XFCMbpR4iFkVyle83KTgeDUPYnPh+k7iF2YPmryBeZOiNKlmTooU71vzfL3mJclA8rC4gYMC5Y0dhDGA0xgS5RSCxMZRHobCi74Bp0nrFKWUBF4bJoVW6UtTUxytttBKh4c7jnNN3vDxv2D7dETpZOhZquA7pmZFdfpqn77b/jh5Hr17sfHVT7HBc0KruFoa0whUdnMvUC78jqxegBWQ9/Kl0PxtkLJXTRruxKoda7W4oR4iy15YMlW0cuK17wrGfYQjjyRIWrwUgPYcVdnG24mRaBEpd13mgxUhq7aBIb5gyNeZ5xIH5IAKlhkfQPkqOLbO4c8//s2vvhYl++03Veo7BBAAYPVjHacuXg+yEeepg9ddUayquxmpfLRXVG+Sm+soZeA1CzmO5qASarbJTaMumbJ6I9578QbmjY8bEQ40vsZhO06WgHiSiwaXHB0DbVeTc/XaZaOXEXGFhj3FMTF7Cc8DeqGxYT5SdTr5wdApqSS1HBJDIWGuQpZbqzW9YJ/h4hBl9O7//v6cZmiX3zXkT8W6WH3m9jDay+C7A/8BVM80FDgeu+cQxJjyPVw2xU6259t4cx4fY8VeDX9B023vryKTrieDkhxngUx1L9LCUBBDNuk+KCe5LpFoOVhPXKMoicJxAi3GeNEKeu74hfjUGszD2kLDYlKJG36yVk80KbWFWgbAew/lX39iRox3n8rfh3982f+Npg3z69FeAwihp674EyCL66PgcbKegMxHc+l9V4LPij9cOmFBW5FS+qb3bQY+RO6Wrt58m0CqgxI8Uxxn+hrT/FVfYlb0fb8GcV+JHclGDjbE5zxfUOA4rSNcONwtvmMgX7TGWVOwtUfT7JtAB4LIxK1NFj8TqY1mPZBRViBf1EoF7Pj/BxpbA439ytNwAAAAAElFTkSuQmCC");border:0 none;display:flex;height:100%;position:absolute;width:100%;z-index:1}
-div.overlay{height:40px;margin:0 auto;opacity:0;pointer-events:none;position:absolute;text-align:center;transition:opacity .3s;width:100%;z-index:3}
-div.overlay>div{pointer-events:none}
-div.background>div,div.overlay>div{margin:auto}
-#filesystem{background-color:#e00000;border:1px solid #fc6458;color:#fcf880;display:none;outline:#a00000;padding:0 4px;width:600px}
-#message,#title{background-color:#838383;border:1px solid #a8a8a8;outline:1px solid #626262;padding:0 4px;min-width:260px}
-#box.error #message,#box.error #title{background-color:#e00000;border:1px solid #fc6458;outline:#a00000}
-#box.error #message{color:#fcf880}
-#title{color:#fcfcfc;height:20px;text-shadow:1px 1px #101010}
-#message{color:#101010;padding:4px 4px}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenTTD</title>
 
-/* Canvas: hide OS cursor and enable custom touch gestures */
-canvas.emscripten{border:0 none;height:100%;position:absolute;width:100%;z-index:2;cursor:none!important;touch-action:none}
-</style></head>
+<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if Pages injects it). -->
+<meta http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self' data: blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com;
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        font-src 'self' data:;
+        object-src 'none';
+        worker-src 'self' blob:;
+        base-uri 'self';
+        connect-src
+          'self'
+          https://cdn.openttd.org
+          https://servers.openttd.org
+          https://bananas.openttd.org
+          wss://bananas-server.openttd.org
+          https://content.openttd.org
+          wss://content.openttd.org:3978
+          https://cloudflareinsights.com;
+        upgrade-insecure-requests;
+      ">
+
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
+  #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
+
+  /* Overlay + loading */
+  #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
+  #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
+  #logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease}
+
+  /* --- Toolbar (compact vertical) --- */
+  #toolbar{
+    position:fixed;
+    top:54px;left:10px;z-index:3;
+    background:rgba(0,0,0,.55);
+    border:1px solid #333;border-radius:8px;
+    padding:6px 8px;
+    backdrop-filter:blur(2px);
+    display:none;                /* hidden by default */
+    flex-direction:column !important;
+    gap:4px !important;
+    width:160px !important;      /* compact width */
+    min-width:160px !important;
+    box-sizing:border-box;
+  }
+  #toolbar button{
+    color:#eee;background:#222;border:1px solid #444;border-radius:6px;
+    padding:5px 8px;cursor:pointer;width:100%;text-align:left;
+    font-size:12.5px;line-height:1.2;transition:background .15s;
+  }
+  #toolbar button:hover{background:#2b2b2b}
+
+  /* Link under buttons */
+  #toolbar a {
+    color:#4fc3f7;text-decoration:none;text-align:center;
+    font-size:12.5px;padding:4px 0;margin-top:4px;
+    border-top:1px solid #333;
+  }
+  #toolbar a:hover { color:#81d4fa;text-decoration:underline; }
+
+  /* On-screen toggle button */
+  #toolbar-toggle{
+    position:fixed;top:10px;left:10px;z-index:4;
+    width:38px;height:38px;border-radius:9999px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
+    user-select:none;backdrop-filter:blur(2px);
+    opacity:0;animation:fadeIn 0.4s ease forwards 0.3s;
+  }
+  @keyframes fadeIn { to { opacity:1; } }
+  #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
+  #toolbar-toggle .icon{font-size:18px;line-height:1}
+  #toolbar-toggle[aria-pressed="true"]{outline:2px solid #4caf50;outline-offset:1px}
+
+  #filesystem{
+    display:none;position:fixed;bottom:10px;right:10px;
+    background:rgba(0,0,0,.6);padding:8px 10px;border-radius:8px;
+    color:#fff;font-size:13px;border:1px solid #333;z-index:3
+  }
+  .error{color:#ff6b6b}
+
+  /* Hide system cursor globally; show pointer over toolbar & toggle */
+  html, body, canvas, #canvas, * { cursor: none !important; }
+  #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle * { cursor: pointer !important; }
+</style>
+</head>
+
 <body>
-<div class=background><div id=box><div id=title>Loading ...</div><div id=message></div></div></div>
-<div id=overlay class=overlay><div id=filesystem>Warning: savegames are stored in the Indexed DB of your browser.<br>Your browser can delete savegames without notice!</div></div>
-<div><canvas class=emscripten id=canvas oncontextmenu=event.preventDefault() tabindex=-1></canvas></div>
+  <!-- Toggle -->
+  <button id="toolbar-toggle" type="button" aria-label="Toggle tools" aria-pressed="false" title="Tools">
+    <span class="icon">☰</span>
+  </button>
 
-<script>
-var statusElement=document.getElementById("status"),progressElement=document.getElementById("progress"),spinnerElement=document.getElementById("spinner"),Module={preRun:[],postRun:[],arguments:[],totalDependencies:42,doneDependencies:0,lastDependencies:1,print:function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")),console.log(e)},printErr:function(e){arguments.length>1&&(e=Array.prototype.slice.call(arguments).join(" ")),console.error(e)},canvas:function(){var e=document.getElementById("canvas");return e.addEventListener("webglcontextlost",(function(e){alert("WebGL context lost. You will need to reload the page."),e.preventDefault()}),!1),e}(),setStatus:function(e){if("none"!=document.getElementById("canvas").style.display){var n=e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);n&&(e="("+n[2]+" / "+n[4]+") "+n[1]),document.getElementById("message").innerHTML=e}},monitorRunDependencies:function(e){e<Module.lastDependencies&&(Module.doneDependencies+=1),Module.lastDependencies=e,total=Module.totalDependencies,doing=Module.doneDependencies+1,doing>total&&(doing=total),document.getElementById("title").innerHTML="("+doing+" / "+total+") Loading ...",document.getElementById("message").innerHTML="Preparing game ..."},onBootstrap:function(e,n){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Missing base graphics",document.getElementById("message").innerHTML="OpenTTD is downloading base graphics.<br/><br/>"+e+" / "+n+" bytes downloaded."},onBootstrapFailed:function(e,n){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Missing base graphics",document.getElementById("message").innerHTML="Failed to download base graphics.<br/>The game cannot start without base graphics.<br/><br/>Please check your Internet connection and/or the console log.<br/>Reload your browser to try again."},onBootstrapReload:function(){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Missing base graphics",document.getElementById("message").innerHTML="Downloading base graphics done.<br/><br/>Your browser will reload to start the game."},onExit:function(){document.getElementById("canvas").style.display="none",document.getElementById("title").innerHTML="Thank you for playing!",document.getElementById("message").innerHTML="We hope you enjoyed OpenTTD!<br/><br/>Reload your browser to restart the game."},onAbort:function(){document.getElementById("canvas").style.display="none",document.getElementById("box").className="error",document.getElementById("title").innerHTML="Crash :(",document.getElementById("message").innerHTML="The game crashed!<br/><br/>Please reload your browser to restart the game."},onWarningFs:function(){document.getElementById("filesystem").style.display="inline-block",document.getElementById("overlay").style.opacity=1,setTimeout((function(){document.getElementById("overlay").style.opacity=0,setTimeout((function(){document.getElementById("filesystem").style.display="none"}),300)}),1e4)}};window.onerror=function(){Module.onAbort()}
-</script>
-<script async src="openttd.js"></script>
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <button type="button" onclick="exportSave()">Export Save</button>
+    <button type="button" onclick="importSave()">Import Save</button>
+    <button type="button" onclick="exportScenario()">Export Scenario</button>
+    <button type="button" onclick="importScenario()">Import Scenario</button>
+    <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
+    <button type="button" onclick="importHeightmap()">Import Heightmap</button>
+    <a href="https://embed.openttdonline.com/" target="_blank" rel="noopener">Embed to page</a>
+  </div>
 
-<script>
-(function(){
+  <canvas id="canvas" tabindex="-1"></canvas>
+
+  <div id="overlay">
+    <div id="box">
+      <h2 id="title">(0 / 42) Loading ...</h2>
+      <p id="message">Preparing game ...</p>
+    </div>
+  </div>
+
+  <img id="logo" src="overgrown.png" alt="Overgrown logo">
+  <div id="filesystem">Saving files…</div>
+
+  <script>
+    /* --- Paths --- */
+    const LIVE_ROOT  = '/home/web_user/.openttd';           // where OpenTTD reads/writes
+    const SAVE_DIR   = LIVE_ROOT + '/save/';
+    const SCEN_DIR   = LIVE_ROOT + '/scenario/';
+    const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
+
+    const IDB_ROOT   = '/idb';                               // our IndexedDB mount
+    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;                 // mirror path inside IDBFS
+
+    /* UI refs */
+    const toolbar   = document.getElementById('toolbar');
+    const toggleBtn = document.getElementById('toolbar-toggle');
+    const logo      = document.getElementById('logo');
+
+    /* Toolbar toggle + persistence */
+    const TOOLBAR_KEY = 'openttd_toolbar_visible';
+    function setToolbar(visible, {persist=true} = {}){
+      toolbar.style.display = visible ? 'flex' : 'none';
+      toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      if (persist) { try{ localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); }catch(_){} }
+    }
+    toggleBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      setToolbar(toolbar.style.display !== 'flex');
+    });
+    try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1', {persist:false}); }catch(_){ setToolbar(false,{persist:false}); }
+
+    /* Auto-hide on outside click/tap + Esc */
+    function clickOutsideHandler(e){
+      const isOutside = !toolbar.contains(e.target) && !toggleBtn.contains(e.target);
+      if (toolbar.style.display === 'flex' && isOutside) setToolbar(false);
+    }
+    document.addEventListener('mousedown', clickOutsideHandler);
+    document.addEventListener('touchstart', clickOutsideHandler, {passive:true});
+    document.addEventListener('keydown', (e)=>{
+      if (e.key === 'Escape' && toolbar.style.display === 'flex') setToolbar(false);
+    });
+
+    /* Overlay helpers */
+    function showGameUI(){
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=0;
+      setTimeout(()=>{ov.style.display='none';},400);
+      logo.style.opacity=0;
+      setTimeout(()=>logo.style.display='none',600);
+    }
+    function showOverlay(title,msg){
+      const ov=document.getElementById('overlay');
+      ov.style.display='flex'; ov.style.opacity=1;
+      if(title)document.getElementById('title').textContent=title;
+      if(msg)document.getElementById('message').innerHTML=msg;
+      logo.style.opacity=1;
+    }
+
+    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
+    let __idbReady = false;
+
+    function mkdirp(path){
+      const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
+      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
+    }
+    function exists(path){
+      try{ FS.stat(path); return true; }catch(_){ return false; }
+    }
+    function readdirSafe(dir){
+      try { return FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'); } catch(_) { return []; }
+    }
+    function copyFile(src, dst){
+      const data = FS.readFile(src);
+      mkdirp(dst.substring(0, dst.lastIndexOf('/')));
+      FS.writeFile(dst, data);
+    }
+    function copyTree(srcDir, dstDir){
+      mkdirp(dstDir);
+      for(const name of readdirSafe(srcDir)){
+        const s = srcDir + '/' + name;
+        const d = dstDir + '/' + name;
+        const st = FS.stat(s);
+        if (st.mode && (st.mode & 0x4000)) { // S_IFDIR
+          copyTree(s, d);
+        } else {
+          copyFile(s, d);
+        }
+      }
+    }
+
+    function ensureIDBMounted() {
+      return new Promise((resolve, reject) => {
+        try {
+          if (__idbReady) return resolve();
+          mkdirp(IDB_ROOT);
+          // If not mounted yet, mount IDBFS at /idb
+          let mounted = false;
+          try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
+          if (!mounted) {
+            FS.mount(IDBFS, {}, IDB_ROOT);
+          }
+          FS.syncfs(true, (err) => {
+            if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
+            __idbReady = true;
+            // After pulling from IndexedDB, restore into the live tree
+            if (exists(IDB_MIRROR)) {
+              mkdirp(LIVE_ROOT);
+              copyTree(IDB_MIRROR, LIVE_ROOT);
+            }
+            resolve();
+          });
+        } catch (e) {
+          console.error('IDBFS mount error', e);
+          reject(e);
+        }
+      });
+    }
+
+    function persistToIDB() {
+      return new Promise((resolve, reject) => {
+        try {
+          // Mirror live tree -> /idb mirror
+          mkdirp(IDB_MIRROR);
+          copyTree(LIVE_ROOT, IDB_MIRROR);
+          FS.syncfs(false, (err) => err ? reject(err) : resolve());
+        } catch (e) { reject(e); }
+      });
+    }
+
+    // Emergency flush on unload
+    window.addEventListener('beforeunload', () => {
+      try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
+    });
+
+    // Small autosync so in-game saves persist without pressing anything (every 10s)
+    setInterval(() => {
+      if (__idbReady) {
+        try { persistToIDB().catch(()=>{}); } catch(_) {}
+      }
+    }, 10000);
+
+    /* FS helpers */
+    function newestByMtime(dir, exts){
+      try{
+        const items = FS.readdir(dir)
+          .filter(f=>f!=='.'&&f!=='..')
+          .filter(f=>{
+            const low=f.toLowerCase();
+            return (Array.isArray(exts)? exts : [exts]).some(ext=>low.endsWith(ext));
+          });
+        if(!items.length) return null;
+        let best = items[0], t = 0;
+        for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
+        return best;
+      }catch(_){ return null; }
+    }
+
+    /* Emscripten Module */
+    var Module = window.Module || {};
+    Module.preRun=[]; Module.postRun=[]; Module.arguments=[];
+    Module.totalDependencies=42; Module.doneDependencies=0; Module.lastDependencies=1;
+
+    // Mount /idb and restore before the game starts
+    Module.preRun.push(function(){
+      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
+    });
+
+    Module.print  = (...a)=>console.log(a.join(' '));
+    Module.printErr = (...a)=>console.error(a.join(' '));
+
+    Module.canvas = (()=>{
+      var e=document.getElementById("canvas");
+      e.addEventListener("webglcontextlost",ev=>{
+        alert("WebGL context lost. Reload the page."); ev.preventDefault();
+      },false);
+      return e;
+    })();
+
+    Module.setStatus = function(e){
+      const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+      if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`;
+      document.getElementById("message").innerHTML = e || '';
+      if(e==='Running...') showGameUI();
+    };
+    Module.monitorRunDependencies = function(e){
+      if(e<Module.lastDependencies) Module.doneDependencies++;
+      Module.lastDependencies=e;
+      const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total);
+      document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`;
+      document.getElementById("message").textContent = "Preparing game ...";
+    };
+
+    Module.onBootstrap=(bytes,total)=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics",`OpenTTD is downloading base graphics.<br><br>${bytes} / ${total} bytes downloaded.`);
+    };
+    Module.onBootstrapFailed=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Failed to download base graphics.<br>The game cannot start without them.<br><br>Check your connection and reload.");
+    };
+    Module.onBootstrapReload=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Download complete.<br>Your browser will reload shortly.");
+    };
+    Module.onExit=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Thank you for playing!","Reload your browser to restart.");
+    };
+    Module.onAbort=()=>{
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("box").className="error";
+      showOverlay("Crash :(","The game crashed! Reload to restart.");
+    };
+
+    const _onWarningFsImpl=()=>{
+      const fsEl=document.getElementById('filesystem');
+      fsEl.style.display='inline-block';
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=1;
+      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
+    };
+    Module.onWarningFs=_onWarningFsImpl;
+    Module.onRuntimeInitialized=()=>showGameUI();
+    Module.postRun.push(showGameUI);
+    Module.locateFile=p=>p;
+    window.onerror=()=>Module.onAbort();
+
+    /* Download helper */
+    function downloadBinary(name, data, type='application/octet-stream'){
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([data],{type}));
+      a.download=name; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),100);
+    }
+
+    /* Save import/export (live + persistent mirror) */
+    async function exportSave(){
+      try{
+        const name=newestByMtime(SAVE_DIR,['.sav']);
+        if(!name){alert('No .sav found in '+SAVE_DIR);return;}
+        const data=FS.readFile(SAVE_DIR+name);
+        downloadBinary(name,data);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importSave(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.sav';
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f)return;
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(SAVE_DIR); mkdirp(IDB_MIRROR + '/save/');
+          FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));                 // live
+          FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));    // persistent
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+      };
+      input.click();
+    }
+
+    /* Scenario import/export */
+    async function exportScenario(){
+      try{
+        const name=newestByMtime(SCEN_DIR,['.scn']);
+        if(!name){alert('No .scn found in '+SCEN_DIR);return;}
+        const data=FS.readFile(SCEN_DIR+name);
+        downloadBinary(name,data);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importScenario(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.scn';
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f)return;
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(SCEN_DIR); mkdirp(IDB_MIRROR + '/scenario/');
+          FS.writeFile(SCEN_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+      };
+      input.click();
+    }
+
+    /* Heightmap import/export */
+    async function exportHeightmap(){
+      try{
+        const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
+        if(!name){alert('No heightmap (.png or .bmp) found in '+HEIGHT_DIR);return;}
+        const data=FS.readFile(HEIGHT_DIR+name);
+        const type = name.toLowerCase().endsWith('.png') ? 'image/png'
+                   : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
+                   : 'application/octet-stream';
+        downloadBinary(name,data,type);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importHeightmap(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp';
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f)return;
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(HEIGHT_DIR); mkdirp(IDB_MIRROR + '/scenario/heightmap/');
+          FS.writeFile(HEIGHT_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/heightmap/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+      };
+      input.click();
+    }
+  </script>
+
+  <!-- Load the Emscripten build last -->
+  <script src="openttd.js"></script>
+
+  <script>
+  (function(){
   const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
 
   function attach(){
@@ -92,9 +509,9 @@ var statusElement=document.getElementById("status"),progressElement=document.get
       attach();
     };
     window.addEventListener('load', () => setTimeout(attach, 0));
-  }
-})();
+    }
+  })();
 </script>
-
-  
-</body></html>
+      
+</body>
+</html>
