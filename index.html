@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://openttdonline.com/">
 
-<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if enabled by Pages). -->
+<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if Pages injects it). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
@@ -58,7 +58,7 @@
     display:none;                /* hidden by default */
     flex-direction:column !important;
     gap:4px !important;
-    width:160px !important;      /* force compact width */
+    width:160px !important;      /* compact width */
     min-width:160px !important;
     box-sizing:border-box;
   }
@@ -135,10 +135,13 @@
 
   <script>
     /* --- Paths --- */
-    const ROOT_DIR  = '/home/web_user/.openttd';           // mount point for IDBFS
-    const SAVE_DIR  = ROOT_DIR + '/save/';
-    const SCEN_DIR  = ROOT_DIR + '/scenario/';
-    const HEIGHT_DIR= ROOT_DIR + '/scenario/heightmap/';
+    const LIVE_ROOT  = '/home/web_user/.openttd';           // where OpenTTD reads/writes
+    const SAVE_DIR   = LIVE_ROOT + '/save/';
+    const SCEN_DIR   = LIVE_ROOT + '/scenario/';
+    const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
+
+    const IDB_ROOT   = '/idb';                               // our IndexedDB mount
+    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;                 // mirror path inside IDBFS
 
     /* UI refs */
     const toolbar   = document.getElementById('toolbar');
@@ -185,30 +188,57 @@
       logo.style.opacity=1;
     }
 
-    /* ---------- Persistence via IDBFS ---------- */
-    // Ensure IDBFS is mounted at ROOT_DIR; pull from DB on first run.
+    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
     let __idbReady = false;
+
     function mkdirp(path){
       const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
       let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
     }
-    function ensurePersistentMount() {
+    function exists(path){
+      try{ FS.stat(path); return true; }catch(_){ return false; }
+    }
+    function readdirSafe(dir){
+      try { return FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'); } catch(_) { return []; }
+    }
+    function copyFile(src, dst){
+      const data = FS.readFile(src);
+      mkdirp(dst.substring(0, dst.lastIndexOf('/')));
+      FS.writeFile(dst, data);
+    }
+    function copyTree(srcDir, dstDir){
+      mkdirp(dstDir);
+      for(const name of readdirSafe(srcDir)){
+        const s = srcDir + '/' + name;
+        const d = dstDir + '/' + name;
+        const st = FS.stat(s);
+        if (st.mode && (st.mode & 0x4000)) { // S_IFDIR
+          copyTree(s, d);
+        } else {
+          copyFile(s, d);
+        }
+      }
+    }
+
+    function ensureIDBMounted() {
       return new Promise((resolve, reject) => {
         try {
           if (__idbReady) return resolve();
-          mkdirp(ROOT_DIR);
-          // If already mounted, FS.lookupPath will have a mount on the node:
+          mkdirp(IDB_ROOT);
+          // If not mounted yet, mount IDBFS at /idb
           let mounted = false;
-          try {
-            mounted = !!FS.lookupPath(ROOT_DIR).node.mounted;
-          } catch(_) {}
+          try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
           if (!mounted) {
-            FS.mount(IDBFS, {}, ROOT_DIR);
+            FS.mount(IDBFS, {}, IDB_ROOT);
           }
           FS.syncfs(true, (err) => {
             if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
             __idbReady = true;
-            console.log('IDBFS mounted at', ROOT_DIR);
+            // After pulling from IndexedDB, restore into the live tree
+            if (exists(IDB_MIRROR)) {
+              mkdirp(LIVE_ROOT);
+              copyTree(IDB_MIRROR, LIVE_ROOT);
+            }
             resolve();
           });
         } catch (e) {
@@ -217,17 +247,29 @@
         }
       });
     }
-    function persistSync() {
+
+    function persistToIDB() {
       return new Promise((resolve, reject) => {
         try {
+          // Mirror live tree -> /idb mirror
+          mkdirp(IDB_MIRROR);
+          copyTree(LIVE_ROOT, IDB_MIRROR);
           FS.syncfs(false, (err) => err ? reject(err) : resolve());
         } catch (e) { reject(e); }
       });
     }
-    // Last-chance flush on unload
+
+    // Emergency flush on unload
     window.addEventListener('beforeunload', () => {
       try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
     });
+
+    // Small autosync so in-game saves persist without pressing anything (every 10s)
+    setInterval(() => {
+      if (__idbReady) {
+        try { persistToIDB().catch(()=>{}); } catch(_) {}
+      }
+    }, 10000);
 
     /* FS helpers */
     function newestByMtime(dir, exts){
@@ -250,9 +292,9 @@
     Module.preRun=[]; Module.postRun=[]; Module.arguments=[];
     Module.totalDependencies=42; Module.doneDependencies=0; Module.lastDependencies=1;
 
-    // Mount IDBFS before the app touches the filesystem
+    // Mount /idb and restore before the game starts
     Module.preRun.push(function(){
-      return ensurePersistentMount().catch(()=>{ /* still let game start */ });
+      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
     });
 
     Module.print  = (...a)=>console.log(a.join(' '));
@@ -323,7 +365,7 @@
       setTimeout(()=>URL.revokeObjectURL(a.href),100);
     }
 
-    /* Save import/export (now persisted) */
+    /* Save import/export (live + persistent mirror) */
     async function exportSave(){
       try{
         const name=newestByMtime(SAVE_DIR,['.sav']);
@@ -338,17 +380,18 @@
         const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
-          await ensurePersistentMount();
-          mkdirp(SAVE_DIR);
-          FS.writeFile(SAVE_DIR+f.name,new Uint8Array(buf));
-          await persistSync();
+          await ensureIDBMounted();
+          mkdirp(SAVE_DIR); mkdirp(IDB_MIRROR + '/save/');
+          FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));                 // live
+          FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));    // persistent
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
-        }catch(err){alert('Import failed: '+err.message);}
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
       };
       input.click();
     }
 
-    /* Scenario import/export (persisted) */
+    /* Scenario import/export */
     async function exportScenario(){
       try{
         const name=newestByMtime(SCEN_DIR,['.scn']);
@@ -363,17 +406,18 @@
         const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
-          await ensurePersistentMount();
-          mkdirp(SCEN_DIR);
-          FS.writeFile(SCEN_DIR+f.name,new Uint8Array(buf));
-          await persistSync();
+          await ensureIDBMounted();
+          mkdirp(SCEN_DIR); mkdirp(IDB_MIRROR + '/scenario/');
+          FS.writeFile(SCEN_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
-        }catch(err){alert('Import failed: '+err.message);}
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
       };
       input.click();
     }
 
-    /* Heightmap import/export (persisted) */
+    /* Heightmap import/export */
     async function exportHeightmap(){
       try{
         const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
@@ -391,12 +435,13 @@
         const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
-          await ensurePersistentMount();
-          mkdirp(HEIGHT_DIR);
-          FS.writeFile(HEIGHT_DIR+f.name,new Uint8Array(buf));
-          await persistSync();
+          await ensureIDBMounted();
+          mkdirp(HEIGHT_DIR); mkdirp(IDB_MIRROR + '/scenario/heightmap/');
+          FS.writeFile(HEIGHT_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/heightmap/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
-        }catch(err){alert('Import failed: '+err.message);}
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
       };
       input.click();
     }
