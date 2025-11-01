@@ -134,10 +134,11 @@
   <div id="filesystem">Saving files…</div>
 
   <script>
-    /* Directories */
-    const SAVE_DIR   = '/home/web_user/.openttd/save/';
-    const SCEN_DIR   = '/home/web_user/.openttd/scenario/';
-    const HEIGHT_DIR = '/home/web_user/.openttd/scenario/heightmap/';
+    /* --- Paths --- */
+    const ROOT_DIR  = '/home/web_user/.openttd';           // mount point for IDBFS
+    const SAVE_DIR  = ROOT_DIR + '/save/';
+    const SCEN_DIR  = ROOT_DIR + '/scenario/';
+    const HEIGHT_DIR= ROOT_DIR + '/scenario/heightmap/';
 
     /* UI refs */
     const toolbar   = document.getElementById('toolbar');
@@ -184,11 +185,51 @@
       logo.style.opacity=1;
     }
 
-    /* FS helpers */
+    /* ---------- Persistence via IDBFS ---------- */
+    // Ensure IDBFS is mounted at ROOT_DIR; pull from DB on first run.
+    let __idbReady = false;
     function mkdirp(path){
       const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
       let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
     }
+    function ensurePersistentMount() {
+      return new Promise((resolve, reject) => {
+        try {
+          if (__idbReady) return resolve();
+          mkdirp(ROOT_DIR);
+          // If already mounted, FS.lookupPath will have a mount on the node:
+          let mounted = false;
+          try {
+            mounted = !!FS.lookupPath(ROOT_DIR).node.mounted;
+          } catch(_) {}
+          if (!mounted) {
+            FS.mount(IDBFS, {}, ROOT_DIR);
+          }
+          FS.syncfs(true, (err) => {
+            if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
+            __idbReady = true;
+            console.log('IDBFS mounted at', ROOT_DIR);
+            resolve();
+          });
+        } catch (e) {
+          console.error('IDBFS mount error', e);
+          reject(e);
+        }
+      });
+    }
+    function persistSync() {
+      return new Promise((resolve, reject) => {
+        try {
+          FS.syncfs(false, (err) => err ? reject(err) : resolve());
+        } catch (e) { reject(e); }
+      });
+    }
+    // Last-chance flush on unload
+    window.addEventListener('beforeunload', () => {
+      try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
+    });
+
+    /* FS helpers */
     function newestByMtime(dir, exts){
       try{
         const items = FS.readdir(dir)
@@ -208,6 +249,11 @@
     var Module = window.Module || {};
     Module.preRun=[]; Module.postRun=[]; Module.arguments=[];
     Module.totalDependencies=42; Module.doneDependencies=0; Module.lastDependencies=1;
+
+    // Mount IDBFS before the app touches the filesystem
+    Module.preRun.push(function(){
+      return ensurePersistentMount().catch(()=>{ /* still let game start */ });
+    });
 
     Module.print  = (...a)=>console.log(a.join(' '));
     Module.printErr = (...a)=>console.error(a.join(' '));
@@ -277,7 +323,7 @@
       setTimeout(()=>URL.revokeObjectURL(a.href),100);
     }
 
-    /* Save import/export */
+    /* Save import/export (now persisted) */
     async function exportSave(){
       try{
         const name=newestByMtime(SAVE_DIR,['.sav']);
@@ -292,16 +338,17 @@
         const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
+          await ensurePersistentMount();
           mkdirp(SAVE_DIR);
           FS.writeFile(SAVE_DIR+f.name,new Uint8Array(buf));
-          if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
-          alert('Imported to '+SAVE_DIR+f.name);
+          await persistSync();
+          alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
         }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
     }
 
-    /* Scenario import/export */
+    /* Scenario import/export (persisted) */
     async function exportScenario(){
       try{
         const name=newestByMtime(SCEN_DIR,['.scn']);
@@ -316,16 +363,17 @@
         const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
+          await ensurePersistentMount();
           mkdirp(SCEN_DIR);
           FS.writeFile(SCEN_DIR+f.name,new Uint8Array(buf));
-          if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
-          alert('Imported scenario to '+SCEN_DIR+f.name);
+          await persistSync();
+          alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
         }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
     }
 
-    /* Heightmap import/export */
+    /* Heightmap import/export (persisted) */
     async function exportHeightmap(){
       try{
         const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
@@ -343,10 +391,11 @@
         const f=e.target.files[0]; if(!f)return;
         const buf=await f.arrayBuffer();
         try{
+          await ensurePersistentMount();
           mkdirp(HEIGHT_DIR);
           FS.writeFile(HEIGHT_DIR+f.name,new Uint8Array(buf));
-          if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
-          alert('Imported heightmap to '+HEIGHT_DIR+f.name + '\n\nLoad it via Scenario Editor → Heightmap.');
+          await persistSync();
+          alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
         }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
