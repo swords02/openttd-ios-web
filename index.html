@@ -50,7 +50,7 @@
     display:none; /* hidden by default */
     flex-direction:column !important;
     gap:6px !important;
-    width:180px !important;      /* slightly wider for mobile labels */
+    width:180px !important;
     min-width:160px !important;
     box-sizing:border-box;
     -webkit-tap-highlight-color: transparent;
@@ -66,7 +66,7 @@
 
   /* On-screen toggle button */
   #toolbar-toggle{
-    position:fixed;top:10px;right:10px; /* moved from left to right */
+    position:fixed;top:10px;right:10px;
     z-index:4;
     width:42px;height:42px;border-radius:9999px;
     display:flex;align-items:center;justify-content:center;
@@ -91,7 +91,6 @@
   html, body, canvas, #canvas, * { cursor: none !important; }
   #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle * { cursor: pointer !important; }
 
-  /* Mobile tweaks */
   @media (max-width: 480px){
     #toolbar{ width: 200px !important; }
     #toolbar button{ font-size:15px; padding:12px 14px; }
@@ -113,7 +112,6 @@
     <button type="button" onclick="importScenario()">Import Scenario</button>
     <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
     <button type="button" onclick="importHeightmap()">Import Heightmap</button>
-    <!-- Removed: Embed to page -->
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -125,18 +123,31 @@
     </div>
   </div>
 
-  <img id="logo" src="overgrown.png" alt="Overgrown logo">
+  <!-- If this image isn't present, it hides itself (no 404 noise) -->
+  <img id="logo" src="overgrown.png" alt="Overgrown logo" onerror="this.style.display='none'">
+
   <div id="filesystem">Saving files…</div>
 
   <script>
+    /* ---------- Robust Emscripten Module bootstrap ---------- */
+    // Ensure a single shared Module object and that preRun/postRun/arguments are arrays
+    (function(){
+      var M = window.Module || {};
+      if (!Array.isArray(M.preRun))     M.preRun = [];
+      if (!Array.isArray(M.postRun))    M.postRun = [];
+      if (!Array.isArray(M.arguments))  M.arguments = [];
+      // Expose back
+      window.Module = M;
+    })();
+
     /* --- Paths --- */
-    const LIVE_ROOT  = '/home/web_user/.openttd';           // where OpenTTD reads/writes
+    const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
     const SCEN_DIR   = LIVE_ROOT + '/scenario/';
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
 
-    const IDB_ROOT   = '/idb';                               // our IndexedDB mount
-    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;                 // mirror path inside IDBFS
+    const IDB_ROOT   = '/idb';
+    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
 
     /* UI refs */
     const toolbar   = document.getElementById('toolbar');
@@ -172,15 +183,14 @@
       const ov=document.getElementById('overlay');
       ov.style.opacity=0;
       setTimeout(()=>{ov.style.display='none';},400);
-      logo.style.opacity=0;
-      setTimeout(()=>logo.style.display='none',600);
+      if (logo){ logo.style.opacity=0; setTimeout(()=>logo.style.display='none',600); }
     }
     function showOverlay(title,msg){
       const ov=document.getElementById('overlay');
       ov.style.display='flex'; ov.style.opacity=1;
       if(title)document.getElementById('title').textContent=title;
       if(msg)document.getElementById('message').innerHTML=msg;
-      logo.style.opacity=1;
+      if (logo) logo.style.opacity=1;
     }
 
     /* ---------- IDBFS at /idb (mirror strategy) ---------- */
@@ -220,7 +230,6 @@
         try {
           if (__idbReady) return resolve();
           mkdirp(IDB_ROOT);
-          // If not mounted yet, mount IDBFS at /idb
           let mounted = false;
           try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
           if (!mounted) {
@@ -229,7 +238,6 @@
           FS.syncfs(true, (err) => {
             if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
             __idbReady = true;
-            // After pulling from IndexedDB, restore into the live tree
             if (exists(IDB_MIRROR)) {
               mkdirp(LIVE_ROOT);
               copyTree(IDB_MIRROR, LIVE_ROOT);
@@ -246,7 +254,6 @@
     function persistToIDB() {
       return new Promise((resolve, reject) => {
         try {
-          // Mirror live tree -> /idb mirror
           mkdirp(IDB_MIRROR);
           copyTree(LIVE_ROOT, IDB_MIRROR);
           FS.syncfs(false, (err) => err ? reject(err) : resolve());
@@ -259,7 +266,7 @@
       try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
     });
 
-    // Small autosync so in-game saves persist without pressing anything (every 10s)
+    // Small autosync (every 10s)
     setInterval(() => {
       if (__idbReady) {
         try { persistToIDB().catch(()=>{}); } catch(_) {}
@@ -282,51 +289,115 @@
       }catch(_){ return null; }
     }
 
+    /* ---------- Ensure Module arrays exist before openttd.js uses them ---------- */
+    (function(){
+      var M = window.Module;
+      if (!Array.isArray(M.preRun))     M.preRun = [];
+      if (!Array.isArray(M.postRun))    M.postRun = [];
+      if (!Array.isArray(M.arguments))  M.arguments = [];
+      // Provide some defaults used by our overlay/status handlers
+      M.totalDependencies = typeof M.totalDependencies === 'number' ? M.totalDependencies : 42;
+      M.doneDependencies  = typeof M.doneDependencies  === 'number' ? M.doneDependencies  : 0;
+      M.lastDependencies  = typeof M.lastDependencies  === 'number' ? M.lastDependencies  : 1;
+      window.Module = M;
+    })();
+
+    /* Emscripten hooks */
+    Module.preRun.push(function(){
+      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
+    });
+
+    Module.print   = (...a)=>console.log(a.join(' '));
+    Module.printErr= (...a)=>console.error(a.join(' '));
+
+    Module.canvas = (()=>{
+      var e=document.getElementById("canvas");
+      e.addEventListener("webglcontextlost",ev=>{
+        alert("WebGL context lost. Reload the page."); ev.preventDefault();
+      },false);
+      return e;
+    })();
+
+    Module.setStatus = function(e){
+      const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+      if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`;
+      document.getElementById("message").innerHTML = e || '';
+      if(e==='Running...') showGameUI();
+    };
+    Module.monitorRunDependencies = function(e){
+      if(e<Module.lastDependencies) Module.doneDependencies++;
+      Module.lastDependencies=e;
+      const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total);
+      document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`;
+      document.getElementById("message").textContent = "Preparing game ...";
+    };
+
+    Module.onBootstrap=(bytes,total)=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics",`OpenTTD is downloading base graphics.<br><br>${bytes} / ${total} bytes downloaded.`);
+    };
+    Module.onBootstrapFailed=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Failed to download base graphics.<br>The game cannot start without them.<br><br>Check your connection and reload.");
+    };
+    Module.onBootstrapReload=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Download complete.<br>Your browser will reload shortly.");
+    };
+    Module.onExit=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Thank you for playing!","Reload your browser to restart.");
+    };
+    Module.onAbort=()=>{
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("box").className="error";
+      showOverlay("Crash :(","The game crashed! Reload to restart.");
+    };
+
+    const _onWarningFsImpl=()=>{
+      const fsEl=document.getElementById('filesystem');
+      fsEl.style.display='inline-block';
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=1;
+      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
+    };
+    Module.onWarningFs=_onWarningFsImpl;
+    Module.onRuntimeInitialized=()=>showGameUI();
+    Module.postRun.push(showGameUI);
+    Module.locateFile=p=>p;
+    window.onerror=()=>Module.onAbort();
+
     /* ---------- Mobile-friendly export helpers ---------- */
     function openBlobURLInNewContext(url){
-      // Try to open in a new window (webviews sometimes intercept this to native share)
       const win = window.open(url, '_blank', 'noopener');
       if (!win) {
-        // Fallback: clickable temporary link
         const a=document.createElement('a');
         a.href=url; a.target='_blank'; a.rel='noopener';
-        document.body.appendChild(a);
-        a.click();
+        document.body.appendChild(a); a.click();
         setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
       }
     }
 
     async function shareOrDownload(name, data, type='application/octet-stream', preferOpen=false){
       try{
-        // Web Share API (Level 2) with files (best UX on iOS/Android webviews)
         const file = new File([data], name, { type });
         if (navigator.canShare && navigator.canShare({ files:[file] })) {
-          await navigator.share({
-            files:[file],
-            title: 'OpenTTD export',
-            text: name
-          });
+          await navigator.share({ files:[file], title: 'OpenTTD export', text: name });
           return;
         }
       }catch(_){} // ignore and fallback
 
-      // Fallbacks
       const url = URL.createObjectURL(new Blob([data],{type}));
-      if (preferOpen) {
-        openBlobURLInNewContext(url);
-      } else {
+      if (preferOpen) openBlobURLInNewContext(url);
+      else {
         const a=document.createElement('a');
         a.href=url; a.download=name; a.rel='noopener';
-        // In many webviews, download= might be ignored; still try first.
-        document.body.appendChild(a);
-        a.click();
+        document.body.appendChild(a); a.click();
         setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
       }
-      // Revoke a bit later to give the viewer time
       setTimeout(()=>URL.revokeObjectURL(url), 15000);
     }
 
-    /* Download helper (kept for desktop fallback) */
     function downloadBinary(name, data, type='application/octet-stream'){
       const a=document.createElement('a');
       a.href=URL.createObjectURL(new Blob([data],{type}));
@@ -340,14 +411,12 @@
         const name=newestByMtime(SAVE_DIR,['.sav']);
         if(!name){alert('No .sav found in '+SAVE_DIR);return;}
         const data=FS.readFile(SAVE_DIR+name);
-        // Prefer mobile-native share experience; fall back to open/download
-        await shareOrDownload(name, data, 'application/octet-stream', /*preferOpen*/ true);
+        await shareOrDownload(name, data, 'application/octet-stream', true);
       }catch(e){alert('Export failed: '+e.message);}
     }
     async function importSave(){
       const input=document.createElement('input');
       input.type='file'; input.accept='.sav';
-      // Make it reliably clickable on iOS webviews
       input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
       document.body.appendChild(input);
       input.onchange=async e=>{
@@ -361,10 +430,7 @@
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
-        finally{
-          try{ document.body.removeChild(input); }catch(_){}
-        }
-      };
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
       input.click();
     }
 
@@ -374,7 +440,7 @@
         const name=newestByMtime(SCEN_DIR,['.scn']);
         if(!name){alert('No .scn found in '+SCEN_DIR);return;}
         const data=FS.readFile(SCEN_DIR+name);
-        await shareOrDownload(name, data, 'application/octet-stream', /*preferOpen*/ true);
+        await shareOrDownload(name, data, 'application/octet-stream', true);
       }catch(e){alert('Export failed: '+e.message);}
     }
     async function importScenario(){
@@ -392,10 +458,7 @@
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
-        finally{
-          try{ document.body.removeChild(input); }catch(_){}
-        }
-      };
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
       input.click();
     }
 
@@ -408,7 +471,7 @@
         const type = name.toLowerCase().endsWith('.png') ? 'image/png'
                    : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
                    : 'application/octet-stream';
-        await shareOrDownload(name, data, type, /*preferOpen*/ true);
+        await shareOrDownload(name, data, type, true);
       }catch(e){alert('Export failed: '+e.message);}
     }
     async function importHeightmap(){
@@ -426,10 +489,7 @@
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
-        finally{
-          try{ document.body.removeChild(input); }catch(_){}
-        }
-      };
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
       input.click();
     }
   </script>
@@ -472,14 +532,13 @@
       const dist = pinchDist(t1, t2);
       const scale = dist / lastDist;
 
-      if (Math.abs(scale - 1) > 0.01) { // smaller deadzone = more responsive
+      if (Math.abs(scale - 1) > 0.01) {
         const cx = (t1.clientX + t2.clientX) / 2;
         const cy = (t1.clientY + t2.clientY) / 2;
 
-        // translate scale to wheel motion with sensitivity applied
         const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
         canvas.dispatchEvent(new WheelEvent('wheel', {
-          deltaY: -delta,  // negative = zoom in
+          deltaY: -delta,
           clientX: cx,
           clientY: cy,
           bubbles: true
