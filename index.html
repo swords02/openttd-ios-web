@@ -41,48 +41,43 @@
   /* --- Toolbar (compact vertical) --- */
   #toolbar{
     position:fixed;
-    top:54px;right:10px; /* moved from left to right */
+    top:54px;right:10px; /* anchored top-right; opens down-left */
     z-index:3;
     background:rgba(0,0,0,.55);
-    border:1px solid #333;border-radius:8px;
-    padding:6px 8px;
+    border:1px solid #333;border-radius:12px;
+    padding:8px 10px;
     backdrop-filter:blur(2px);
-    display:none;                /* hidden by default */
+    display:none; /* hidden by default */
     flex-direction:column !important;
-    gap:4px !important;
-    width:160px !important;      /* compact width */
+    gap:6px !important;
+    width:180px !important;      /* slightly wider for mobile labels */
     min-width:160px !important;
     box-sizing:border-box;
-    /* Anchored on the right, so it visually opens down-left */
+    -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
-    color:#eee;background:#222;border:1px solid #444;border-radius:6px;
-    padding:5px 8px;cursor:pointer;width:100%;text-align:left;
-    font-size:12.5px;line-height:1.2;transition:background .15s;
+    color:#eee;background:#222;border:1px solid #444;border-radius:10px;
+    padding:10px 12px;cursor:pointer;width:100%;text-align:center;
+    font-size:14px;line-height:1.25;transition:background .15s, transform .05s;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none;
   }
+  #toolbar button:active{ transform: scale(0.98); }
   #toolbar button:hover{background:#2b2b2b}
-
-  /* Link under buttons */
-  #toolbar a {
-    color:#4fc3f7;text-decoration:none;text-align:center;
-    font-size:12.5px;padding:4px 0;margin-top:4px;
-    border-top:1px solid #333;
-  }
-  #toolbar a:hover { color:#81d4fa;text-decoration:underline; }
 
   /* On-screen toggle button */
   #toolbar-toggle{
     position:fixed;top:10px;right:10px; /* moved from left to right */
     z-index:4;
-    width:38px;height:38px;border-radius:9999px;
+    width:42px;height:42px;border-radius:9999px;
     display:flex;align-items:center;justify-content:center;
     background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
     user-select:none;backdrop-filter:blur(2px);
     opacity:0;animation:fadeIn 0.4s ease forwards 0.3s;
+    -webkit-tap-highlight-color: transparent;
   }
   @keyframes fadeIn { to { opacity:1; } }
   #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
-  #toolbar-toggle .icon{font-size:18px;line-height:1}
+  #toolbar-toggle .icon{font-size:19px;line-height:1}
   #toolbar-toggle[aria-pressed="true"]{outline:2px solid #4caf50;outline-offset:1px}
 
   #filesystem{
@@ -95,6 +90,12 @@
   /* Hide system cursor globally; show pointer over toolbar & toggle */
   html, body, canvas, #canvas, * { cursor: none !important; }
   #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle * { cursor: pointer !important; }
+
+  /* Mobile tweaks */
+  @media (max-width: 480px){
+    #toolbar{ width: 200px !important; }
+    #toolbar button{ font-size:15px; padding:12px 14px; }
+  }
 </style>
 </head>
 
@@ -112,7 +113,7 @@
     <button type="button" onclick="importScenario()">Import Scenario</button>
     <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
     <button type="button" onclick="importHeightmap()">Import Heightmap</button>
-    <a href="https://embed.openttdonline.com/" target="_blank" rel="noopener">Embed to page</a>
+    <!-- Removed: Embed to page -->
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -281,77 +282,51 @@
       }catch(_){ return null; }
     }
 
-    /* Emscripten Module */
-    var Module = window.Module || {};
-    Module.preRun=[]; Module.postRun=[]; Module.arguments=[];
-    Module.totalDependencies=42; Module.doneDependencies=0; Module.lastDependencies=1;
+    /* ---------- Mobile-friendly export helpers ---------- */
+    function openBlobURLInNewContext(url){
+      // Try to open in a new window (webviews sometimes intercept this to native share)
+      const win = window.open(url, '_blank', 'noopener');
+      if (!win) {
+        // Fallback: clickable temporary link
+        const a=document.createElement('a');
+        a.href=url; a.target='_blank'; a.rel='noopener';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
+      }
+    }
 
-    // Mount /idb and restore before the game starts
-    Module.preRun.push(function(){
-      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
-    });
+    async function shareOrDownload(name, data, type='application/octet-stream', preferOpen=false){
+      try{
+        // Web Share API (Level 2) with files (best UX on iOS/Android webviews)
+        const file = new File([data], name, { type });
+        if (navigator.canShare && navigator.canShare({ files:[file] })) {
+          await navigator.share({
+            files:[file],
+            title: 'OpenTTD export',
+            text: name
+          });
+          return;
+        }
+      }catch(_){} // ignore and fallback
 
-    Module.print  = (...a)=>console.log(a.join(' '));
-    Module.printErr = (...a)=>console.error(a.join(' '));
+      // Fallbacks
+      const url = URL.createObjectURL(new Blob([data],{type}));
+      if (preferOpen) {
+        openBlobURLInNewContext(url);
+      } else {
+        const a=document.createElement('a');
+        a.href=url; a.download=name; a.rel='noopener';
+        // In many webviews, download= might be ignored; still try first.
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
+      }
+      // Revoke a bit later to give the viewer time
+      setTimeout(()=>URL.revokeObjectURL(url), 15000);
+    }
 
-    Module.canvas = (()=>{
-      var e=document.getElementById("canvas");
-      e.addEventListener("webglcontextlost",ev=>{
-        alert("WebGL context lost. Reload the page."); ev.preventDefault();
-      },false);
-      return e;
-    })();
-
-    Module.setStatus = function(e){
-      const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
-      if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`;
-      document.getElementById("message").innerHTML = e || '';
-      if(e==='Running...') showGameUI();
-    };
-    Module.monitorRunDependencies = function(e){
-      if(e<Module.lastDependencies) Module.doneDependencies++;
-      Module.lastDependencies=e;
-      const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total);
-      document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`;
-      document.getElementById("message").textContent = "Preparing game ...";
-    };
-
-    Module.onBootstrap=(bytes,total)=>{
-      document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics",`OpenTTD is downloading base graphics.<br><br>${bytes} / ${total} bytes downloaded.`);
-    };
-    Module.onBootstrapFailed=()=>{
-      document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics","Failed to download base graphics.<br>The game cannot start without them.<br><br>Check your connection and reload.");
-    };
-    Module.onBootstrapReload=()=>{
-      document.getElementById("canvas").style.display="none";
-      showOverlay("Missing base graphics","Download complete.<br>Your browser will reload shortly.");
-    };
-    Module.onExit=()=>{
-      document.getElementById("canvas").style.display="none";
-      showOverlay("Thank you for playing!","Reload your browser to restart.");
-    };
-    Module.onAbort=()=>{
-      document.getElementById("canvas").style.display="none";
-      document.getElementById("box").className="error";
-      showOverlay("Crash :(","The game crashed! Reload to restart.");
-    };
-
-    const _onWarningFsImpl=()=>{
-      const fsEl=document.getElementById('filesystem');
-      fsEl.style.display='inline-block';
-      const ov=document.getElementById('overlay');
-      ov.style.opacity=1;
-      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
-    };
-    Module.onWarningFs=_onWarningFsImpl;
-    Module.onRuntimeInitialized=()=>showGameUI();
-    Module.postRun.push(showGameUI);
-    Module.locateFile=p=>p;
-    window.onerror=()=>Module.onAbort();
-
-    /* Download helper */
+    /* Download helper (kept for desktop fallback) */
     function downloadBinary(name, data, type='application/octet-stream'){
       const a=document.createElement('a');
       a.href=URL.createObjectURL(new Blob([data],{type}));
@@ -359,19 +334,24 @@
       setTimeout(()=>URL.revokeObjectURL(a.href),100);
     }
 
-    /* Save import/export (live + persistent mirror) */
+    /* ---------- Save import/export (live + persistent mirror) ---------- */
     async function exportSave(){
       try{
         const name=newestByMtime(SAVE_DIR,['.sav']);
         if(!name){alert('No .sav found in '+SAVE_DIR);return;}
         const data=FS.readFile(SAVE_DIR+name);
-        downloadBinary(name,data);
+        // Prefer mobile-native share experience; fall back to open/download
+        await shareOrDownload(name, data, 'application/octet-stream', /*preferOpen*/ true);
       }catch(e){alert('Export failed: '+e.message);}
     }
     async function importSave(){
-      const input=document.createElement('input'); input.type='file'; input.accept='.sav';
+      const input=document.createElement('input');
+      input.type='file'; input.accept='.sav';
+      // Make it reliably clickable on iOS webviews
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
       input.onchange=async e=>{
-        const f=e.target.files[0]; if(!f)return;
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
         const buf=await f.arrayBuffer();
         try{
           await ensureIDBMounted();
@@ -381,23 +361,28 @@
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{
+          try{ document.body.removeChild(input); }catch(_){}
+        }
       };
       input.click();
     }
 
-    /* Scenario import/export */
+    /* ---------- Scenario import/export ---------- */
     async function exportScenario(){
       try{
         const name=newestByMtime(SCEN_DIR,['.scn']);
         if(!name){alert('No .scn found in '+SCEN_DIR);return;}
         const data=FS.readFile(SCEN_DIR+name);
-        downloadBinary(name,data);
+        await shareOrDownload(name, data, 'application/octet-stream', /*preferOpen*/ true);
       }catch(e){alert('Export failed: '+e.message);}
     }
     async function importScenario(){
       const input=document.createElement('input'); input.type='file'; input.accept='.scn';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
       input.onchange=async e=>{
-        const f=e.target.files[0]; if(!f)return;
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
         const buf=await f.arrayBuffer();
         try{
           await ensureIDBMounted();
@@ -407,11 +392,14 @@
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{
+          try{ document.body.removeChild(input); }catch(_){}
+        }
       };
       input.click();
     }
 
-    /* Heightmap import/export */
+    /* ---------- Heightmap import/export ---------- */
     async function exportHeightmap(){
       try{
         const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
@@ -420,13 +408,15 @@
         const type = name.toLowerCase().endsWith('.png') ? 'image/png'
                    : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
                    : 'application/octet-stream';
-        downloadBinary(name,data,type);
+        await shareOrDownload(name, data, type, /*preferOpen*/ true);
       }catch(e){alert('Export failed: '+e.message);}
     }
     async function importHeightmap(){
       const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
       input.onchange=async e=>{
-        const f=e.target.files[0]; if(!f)return;
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
         const buf=await f.arrayBuffer();
         try{
           await ensureIDBMounted();
@@ -436,6 +426,9 @@
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{
+          try{ document.body.removeChild(input); }catch(_){}
+        }
       };
       input.click();
     }
@@ -515,6 +508,6 @@
     }
   })();
 </script>
-      
+
 </body>
 </html>
