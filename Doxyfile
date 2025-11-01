@@ -13,7 +13,7 @@ PROJECT_NAME           = "OpenTTD Source"
 PROJECT_NUMBER         = norev0000
 PROJECT_BRIEF          =
 PROJECT_LOGO           =
-OUTPUT_DIRECTORY       = /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/source/
+OUTPUT_DIRECTORY       = /src/build/docs/source/
 CREATE_SUBDIRS         = YES
 CREATE_SUBDIRS_LEVEL   = 8
 ALLOW_UNICODE_NAMES    = NO
@@ -326,7 +326,7 @@ SKIP_FUNCTION_MACROS   = YES
 # Configuration options related to external references
 #---------------------------------------------------------------------------
 TAGFILES               =
-GENERATE_TAGFILE       = /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/openttd.tag
+GENERATE_TAGFILE       = /src/build/docs/openttd.tag
 ALLEXTERNALS           = NO
 EXTERNAL_GROUPS        = YES
 EXTERNAL_PAGES         = YES

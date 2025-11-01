@@ -13,7 +13,7 @@ PROJECT_NAME           = "OpenTTD AI API"
 PROJECT_NUMBER         = norev0000
 PROJECT_BRIEF          =
 PROJECT_LOGO           =
-OUTPUT_DIRECTORY       = /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/ai-api/
+OUTPUT_DIRECTORY       = /src/build/docs/ai-api/
 CREATE_SUBDIRS         = NO
 CREATE_SUBDIRS_LEVEL   = 8
 ALLOW_UNICODE_NAMES    = NO
@@ -127,7 +127,7 @@ WARN_LOGFILE           =
 # Configuration options related to the input files
 #---------------------------------------------------------------------------
 INPUT                  = . \
-                         /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/generated/script/api
+                         /src/build/generated/script/api
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = script_*.hpp \
                          ai_*.hpp
@@ -311,7 +311,7 @@ SKIP_FUNCTION_MACROS   = YES
 # Configuration options related to external references
 #---------------------------------------------------------------------------
 TAGFILES               =
-GENERATE_TAGFILE       = /c/Users/oweng/OneDrive/Desktop/OpenTTD-master/build/docs/openttd_ai_api.tag
+GENERATE_TAGFILE       = /src/build/docs/openttd_ai_api.tag
 ALLEXTERNALS           = NO
 EXTERNAL_GROUPS        = YES
 EXTERNAL_PAGES         = YES
