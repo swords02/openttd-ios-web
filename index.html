@@ -38,21 +38,23 @@
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
   #logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease}
 
-  /* --- Toolbar (compact vertical) --- */
+  /* --- Toolbar (bottom-right, opens up-left) --- */
   #toolbar{
     position:fixed;
-    top:74px;right:10px; /* anchored top-right; opens down-left */
+    bottom: calc(60px + env(safe-area-inset-bottom)); /* above the toggle */
+    right:  calc(10px + env(safe-area-inset-right));
     z-index:3;
     background:rgba(0,0,0,.55);
     border:1px solid #333;border-radius:12px;
     padding:8px 10px;
     backdrop-filter:blur(2px);
     display:none; /* hidden by default */
-    flex-direction:column !important;
+    flex-direction:column-reverse !important; /* first item closest to toggle */
     gap:6px !important;
     width:180px !important;
     min-width:160px !important;
     box-sizing:border-box;
+    transform-origin:bottom right; /* anchor near toggle */
     -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
@@ -64,9 +66,11 @@
   #toolbar button:active{ transform: scale(0.98); }
   #toolbar button:hover{background:#2b2b2b}
 
-  /* On-screen toggle button */
+  /* Toggle (bottom-right) */
   #toolbar-toggle{
-    position:fixed;top:30px;right:10px;
+    position:fixed;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    right:  calc(10px + env(safe-area-inset-right));
     z-index:4;
     width:42px;height:42px;border-radius:9999px;
     display:flex;align-items:center;justify-content:center;
@@ -130,13 +134,11 @@
 
   <script>
     /* ---------- Robust Emscripten Module bootstrap ---------- */
-    // Ensure a single shared Module object and that preRun/postRun/arguments are arrays
     (function(){
       var M = window.Module || {};
       if (!Array.isArray(M.preRun))     M.preRun = [];
       if (!Array.isArray(M.postRun))    M.postRun = [];
       if (!Array.isArray(M.arguments))  M.arguments = [];
-      // Expose back
       window.Module = M;
     })();
 
@@ -295,7 +297,6 @@
       if (!Array.isArray(M.preRun))     M.preRun = [];
       if (!Array.isArray(M.postRun))    M.postRun = [];
       if (!Array.isArray(M.arguments))  M.arguments = [];
-      // Provide some defaults used by our overlay/status handlers
       M.totalDependencies = typeof M.totalDependencies === 'number' ? M.totalDependencies : 42;
       M.doneDependencies  = typeof M.doneDependencies  === 'number' ? M.doneDependencies  : 0;
       M.lastDependencies  = typeof M.lastDependencies  === 'number' ? M.lastDependencies  : 1;
