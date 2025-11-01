@@ -12,11 +12,11 @@
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://openttdonline.com/">
 
-<!-- CSP: allow OpenTTD endpoints (HTTP/S + WSS). -->
+<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if enabled by Pages). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval';
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com;
         style-src 'self' 'unsafe-inline';
         img-src 'self' data: blob:;
         font-src 'self' data:;
@@ -30,7 +30,8 @@
           https://bananas.openttd.org
           wss://bananas-server.openttd.org
           https://content.openttd.org
-          wss://content.openttd.org:3978;
+          wss://content.openttd.org:3978
+          https://cloudflareinsights.com;
         upgrade-insecure-requests;
       ">
 
@@ -117,8 +118,6 @@
     <button type="button" onclick="importScenario()">Import Scenario</button>
     <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
     <button type="button" onclick="importHeightmap()">Import Heightmap</button>
-
-    <!-- NEW: Embed link under buttons -->
     <a href="https://embed.openttdonline.com/" target="_blank" rel="noopener">Embed to page</a>
   </div>
 
@@ -347,7 +346,7 @@
           mkdirp(HEIGHT_DIR);
           FS.writeFile(HEIGHT_DIR+f.name,new Uint8Array(buf));
           if(Module.FS&&Module.FS.syncfs) Module.FS.syncfs(false,()=>{});
-          alert('Imported heightmap to '+HEIGHT_DIR+f.name+\n'\nLoad it via Scenario Editor → Heightmap.');
+          alert('Imported heightmap to '+HEIGHT_DIR+f.name + '\n\nLoad it via Scenario Editor → Heightmap.');
         }catch(err){alert('Import failed: '+err.message);}
       };
       input.click();
