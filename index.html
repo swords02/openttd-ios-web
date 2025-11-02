@@ -498,76 +498,93 @@
   <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
+  <!-- 🔧 Auto-scale UI for mobile / high-DPI displays -->
+  <script>
+  (function () {
+    function updateCanvasScale() {
+      const canvas = document.getElementById('canvas');
+      if (!canvas) return;
+
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      // Smaller logical width = bigger UI
+      const targetLogicalWidth = (vw < 768) ? 960 : 1280;
+      const scale = Math.min(vw / targetLogicalWidth, 1.0);
+
+      const backingW = Math.floor(vw * dpr);
+      const backingH = Math.floor(vh * dpr);
+
+      canvas.width  = backingW;
+      canvas.height = backingH;
+      canvas.style.width  = vw + 'px';
+      canvas.style.height = vh + 'px';
+
+      if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+        Module.setCanvasSize(backingW, backingH, false);
+      }
+
+      // Ensure focus for soft keyboard
+      canvas.tabIndex = 1;
+      canvas.addEventListener('click', () => canvas.focus(), { once: true });
+    }
+
+    window.addEventListener('resize', updateCanvasScale);
+    window.addEventListener('orientationchange', updateCanvasScale);
+    document.addEventListener('DOMContentLoaded', updateCanvasScale);
+    updateCanvasScale();
+  })();
+  </script>
+
+  <!-- Existing pinch-zoom handler -->
   <script>
   (function(){
-  const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
-
-  function attach(){
-    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
-    if (!canvas) return false;
-
-    canvas.style.touchAction = 'none';
-    canvas.style.cursor = 'none';
-
-    let pA = null, pB = null;
-    let lastDist = 0;
-
-    function pinchDist(t1, t2){
-      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-    }
-
-    canvas.addEventListener('touchstart', e => {
-      if (e.touches.length === 2){
+    const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+    function attach(){
+      const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+      if (!canvas) return false;
+      canvas.style.touchAction = 'none';
+      canvas.style.cursor = 'none';
+      let pA = null, pB = null, lastDist = 0;
+      function pinchDist(t1, t2){ return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
+      canvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 2){ e.preventDefault(); pA = e.touches[0]; pB = e.touches[1]; lastDist = pinchDist(pA, pB); }
+      }, {passive:false});
+      canvas.addEventListener('touchmove', e => {
+        if (e.touches.length !== 2) return;
         e.preventDefault();
-        pA = e.touches[0];
-        pB = e.touches[1];
-        lastDist = pinchDist(pA, pB);
-      }
-    }, {passive:false});
-
-    canvas.addEventListener('touchmove', e => {
-      if (e.touches.length !== 2) return;
-      e.preventDefault();
-
-      const t1 = e.touches[0], t2 = e.touches[1];
-      const dist = pinchDist(t1, t2);
-      const scale = dist / lastDist;
-
-      if (Math.abs(scale - 1) > 0.01) {
-        const cx = (t1.clientX + t2.clientX) / 2;
-        const cy = (t1.clientY + t2.clientY) / 2;
-
-        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
-        canvas.dispatchEvent(new WheelEvent('wheel', {
-          deltaY: -delta,
-          clientX: cx,
-          clientY: cy,
-          bubbles: true
-        }));
-        lastDist = dist;
-      }
-    }, {passive:false});
-
-    canvas.addEventListener('touchend', e => {
-      if (e.touches.length < 2) pA = pB = null;
-    }, {passive:false});
-
-    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
-
-    return true;
-  }
-
-  if (!attach()){
-    const prev = (window.Module && Module.onRuntimeInitialized) || null;
-    window.Module = window.Module || {};
-    Module.onRuntimeInitialized = function(){
-      if (prev) prev();
-      attach();
-    };
-    window.addEventListener('load', () => setTimeout(attach, 0));
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const dist = pinchDist(t1, t2);
+        const scale = dist / lastDist;
+        if (Math.abs(scale - 1) > 0.01) {
+          const cx = (t1.clientX + t2.clientX) / 2;
+          const cy = (t1.clientY + t2.clientY) / 2;
+          const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+          canvas.dispatchEvent(new WheelEvent('wheel', {
+            deltaY: -delta,
+            clientX: cx,
+            clientY: cy,
+            bubbles: true
+          }));
+          lastDist = dist;
+        }
+      }, {passive:false});
+      canvas.addEventListener('touchend', e => { if (e.touches.length < 2) pA = pB = null; }, {passive:false});
+      canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+      return true;
+    }
+    if (!attach()){
+      const prev = (window.Module && Module.onRuntimeInitialized) || null;
+      window.Module = window.Module || {};
+      Module.onRuntimeInitialized = function(){
+        if (prev) prev();
+        attach();
+      };
+      window.addEventListener('load', () => setTimeout(attach, 0));
     }
   })();
-</script>
+  </script>
 
 </body>
 </html>
