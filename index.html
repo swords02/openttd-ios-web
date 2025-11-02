@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD</title>
 
+<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if Pages injects it). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
@@ -31,26 +32,29 @@
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
   #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
 
+  /* Overlay + loading */
   #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
   #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
   #logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease}
 
-  /* Toolbar */
+  /* --- Toolbar (bottom-right, opens up-left) --- */
   #toolbar{
     position:fixed;
-    bottom: calc(60px + env(safe-area-inset-bottom));
+    bottom: calc(60px + env(safe-area-inset-bottom)); /* above the toggle */
     right:  calc(10px + env(safe-area-inset-right));
     z-index:3;
     background:rgba(0,0,0,.55);
     border:1px solid #333;border-radius:12px;
     padding:8px 10px;
     backdrop-filter:blur(2px);
-    display:none;
-    flex-direction:column-reverse !important;
+    display:none; /* hidden by default */
+    flex-direction:column-reverse !important; /* first item closest to toggle */
     gap:6px !important;
-    width:180px !important; min-width:160px !important;
-    box-sizing:border-box; transform-origin:bottom right;
+    width:180px !important;
+    min-width:160px !important;
+    box-sizing:border-box;
+    transform-origin:bottom right; /* anchor near toggle */
     -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
@@ -62,6 +66,7 @@
   #toolbar button:active{ transform: scale(0.98); }
   #toolbar button:hover{background:#2b2b2b}
 
+  /* Toggle (bottom-right) */
   #toolbar-toggle{
     position:fixed;
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -86,7 +91,7 @@
   }
   .error{color:#ff6b6b}
 
-  /* Hide system cursor except toolbar/toggle */
+  /* Hide system cursor globally; show pointer over toolbar & toggle */
   html, body, canvas, #canvas, * { cursor: none !important; }
   #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle * { cursor: pointer !important; }
 
@@ -122,95 +127,171 @@
     </div>
   </div>
 
+  <!-- If this image isn't present, it hides itself (no 404 noise) -->
   <img id="logo" src="overgrown.png" alt="Overgrown logo" onerror="this.style.display='none'">
+
   <div id="filesystem">Saving files…</div>
 
   <script>
-    /* ---------- Module bootstrap ---------- */
+    /* ---------- Robust Emscripten Module bootstrap ---------- */
     (function(){
       var M = window.Module || {};
-      if (!Array.isArray(M.preRun))  M.preRun = [];
-      if (!Array.isArray(M.postRun)) M.postRun = [];
-      if (!Array.isArray(M.arguments)) M.arguments = [];
+      if (!Array.isArray(M.preRun))     M.preRun = [];
+      if (!Array.isArray(M.postRun))    M.postRun = [];
+      if (!Array.isArray(M.arguments))  M.arguments = [];
       window.Module = M;
     })();
 
-    /* Paths */
+    /* --- Paths --- */
     const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
     const SCEN_DIR   = LIVE_ROOT + '/scenario/';
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
+
     const IDB_ROOT   = '/idb';
     const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
 
-    /* Toolbar behavior */
+    /* UI refs */
     const toolbar   = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
+    const logo      = document.getElementById('logo');
+
+    /* Toolbar toggle + persistence */
     const TOOLBAR_KEY = 'openttd_toolbar_visible';
-    function setToolbar(visible,{persist=true}={}) {
+    function setToolbar(visible, {persist=true} = {}){
       toolbar.style.display = visible ? 'flex' : 'none';
       toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
-      if (persist) { try { localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); } catch(_){} }
+      if (persist) { try{ localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); }catch(_){} }
     }
-    toggleBtn.addEventListener('click', e => { e.stopPropagation(); setToolbar(toolbar.style.display!=='flex'); });
-    try { setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1', {persist:false}); } catch(_) { setToolbar(false,{persist:false}); }
-    function clickOutsideHandler(e){ if (toolbar.style.display==='flex' && !toolbar.contains(e.target) && !toggleBtn.contains(e.target)) setToolbar(false); }
+    toggleBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      setToolbar(toolbar.style.display !== 'flex');
+    });
+    try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1', {persist:false}); }catch(_){ setToolbar(false,{persist:false}); }
+
+    /* Auto-hide on outside click/tap + Esc */
+    function clickOutsideHandler(e){
+      const isOutside = !toolbar.contains(e.target) && !toggleBtn.contains(e.target);
+      if (toolbar.style.display === 'flex' && isOutside) setToolbar(false);
+    }
     document.addEventListener('mousedown', clickOutsideHandler);
     document.addEventListener('touchstart', clickOutsideHandler, {passive:true});
-    document.addEventListener('keydown', e => { if (e.key === 'Escape' && toolbar.style.display==='flex') setToolbar(false); });
+    document.addEventListener('keydown', (e)=>{
+      if (e.key === 'Escape' && toolbar.style.display === 'flex') setToolbar(false);
+    });
 
     /* Overlay helpers */
-    function showGameUI(){ const ov=document.getElementById('overlay'); ov.style.opacity=0; setTimeout(()=>{ov.style.display='none';},400); const logo=document.getElementById('logo'); if (logo){ logo.style.opacity=0; setTimeout(()=>logo.style.display='none',600);} }
-    function showOverlay(title,msg){ const ov=document.getElementById('overlay'); ov.style.display='flex'; ov.style.opacity=1; if(title)document.getElementById('title').textContent=title; if(msg)document.getElementById('message').innerHTML=msg; const logo=document.getElementById('logo'); if (logo) logo.style.opacity=1; }
+    function showGameUI(){
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=0;
+      setTimeout(()=>{ov.style.display='none';},400);
+      if (logo){ logo.style.opacity=0; setTimeout(()=>logo.style.display='none',600); }
+    }
+    function showOverlay(title,msg){
+      const ov=document.getElementById('overlay');
+      ov.style.display='flex'; ov.style.opacity=1;
+      if(title)document.getElementById('title').textContent=title;
+      if(msg)document.getElementById('message').innerHTML=msg;
+      if (logo) logo.style.opacity=1;
+    }
 
-    /* ---------- IDBFS (mirror) ---------- */
-    let __idbReady=false;
-    function mkdirp(path){ const parts=path.replace(/\/+$/,'').split('/').filter(Boolean); let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){}} }
-    function exists(path){ try{ FS.stat(path); return true; }catch(_){ return false; } }
-    function readdirSafe(dir){ try { return FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'); } catch(_) { return []; } }
-    function copyFile(src,dst){ const data=FS.readFile(src); mkdirp(dst.substring(0, dst.lastIndexOf('/'))); FS.writeFile(dst,data); }
-    function copyTree(srcDir,dstDir){ mkdirp(dstDir); for(const name of readdirSafe(srcDir)){ const s=srcDir+'/'+name, d=dstDir+'/'+name; const st=FS.stat(s); if (st.mode && (st.mode & 0x4000)) copyTree(s,d); else copyFile(s,d); } }
+    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
+    let __idbReady = false;
 
-    function ensureIDBMounted(){
-      return new Promise((resolve,reject)=>{
-        try{
-          if(__idbReady) return resolve();
+    function mkdirp(path){
+      const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
+      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
+    }
+    function exists(path){
+      try{ FS.stat(path); return true; }catch(_){ return false; }
+    }
+    function readdirSafe(dir){
+      try { return FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'); } catch(_) { return []; }
+    }
+    function copyFile(src, dst){
+      const data = FS.readFile(src);
+      mkdirp(dst.substring(0, dst.lastIndexOf('/')));
+      FS.writeFile(dst, data);
+    }
+    function copyTree(srcDir, dstDir){
+      mkdirp(dstDir);
+      for(const name of readdirSafe(srcDir)){
+        const s = srcDir + '/' + name;
+        const d = dstDir + '/' + name;
+        const st = FS.stat(s);
+        if (st.mode && (st.mode & 0x4000)) { // S_IFDIR
+          copyTree(s, d);
+        } else {
+          copyFile(s, d);
+        }
+      }
+    }
+
+    function ensureIDBMounted() {
+      return new Promise((resolve, reject) => {
+        try {
+          if (__idbReady) return resolve();
           mkdirp(IDB_ROOT);
-          try { if (!FS.lookupPath(IDB_ROOT).node.mounted) FS.mount(IDBFS,{},IDB_ROOT); } catch(_) { FS.mount(IDBFS,{},IDB_ROOT); }
-          FS.syncfs(true, err=>{
+          let mounted = false;
+          try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
+          if (!mounted) {
+            FS.mount(IDBFS, {}, IDB_ROOT);
+          }
+          FS.syncfs(true, (err) => {
             if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
-            __idbReady=true;
-            if (exists(IDB_MIRROR)) { mkdirp(LIVE_ROOT); copyTree(IDB_MIRROR, LIVE_ROOT); }
+            __idbReady = true;
+            if (exists(IDB_MIRROR)) {
+              mkdirp(LIVE_ROOT);
+              copyTree(IDB_MIRROR, LIVE_ROOT);
+            }
             resolve();
           });
-        } catch(e){ console.error('IDBFS mount error', e); reject(e); }
+        } catch (e) {
+          console.error('IDBFS mount error', e);
+          reject(e);
+        }
       });
     }
-    function persistToIDB(){
-      return new Promise((resolve,reject)=>{
-        try{
-          mkdirp(IDB_MIRROR); copyTree(LIVE_ROOT, IDB_MIRROR);
-          FS.syncfs(false, err=> err ? reject(err) : resolve());
-        }catch(e){ reject(e); }
+
+    function persistToIDB() {
+      return new Promise((resolve, reject) => {
+        try {
+          mkdirp(IDB_MIRROR);
+          copyTree(LIVE_ROOT, IDB_MIRROR);
+          FS.syncfs(false, (err) => err ? reject(err) : resolve());
+        } catch (e) { reject(e); }
       });
     }
-    window.addEventListener('beforeunload', ()=>{ try{ FS && FS.syncfs && FS.syncfs(false,()=>{});}catch(_){}} );
-    setInterval(()=>{ if(__idbReady){ try{ persistToIDB().catch(()=>{});}catch(_){}} }, 10000);
+
+    // Emergency flush on unload
+    window.addEventListener('beforeunload', () => {
+      try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
+    });
+
+    // Small autosync (every 10s)
+    setInterval(() => {
+      if (__idbReady) {
+        try { persistToIDB().catch(()=>{}); } catch(_) {}
+      }
+    }, 10000);
 
     /* FS helpers */
     function newestByMtime(dir, exts){
       try{
-        const items = FS.readdir(dir).filter(f=>f!=='.'&&f!=='..').filter(f=>{
-          const low=f.toLowerCase(); return (Array.isArray(exts)? exts : [exts]).some(ext=>low.endsWith(ext));
-        });
+        const items = FS.readdir(dir)
+          .filter(f=>f!=='.'&&f!=='..')
+          .filter(f=>{
+            const low=f.toLowerCase();
+            return (Array.isArray(exts)? exts : [exts]).some(ext=>low.endsWith(ext));
+          });
         if(!items.length) return null;
-        let best=items[0], t=0;
+        let best = items[0], t = 0;
         for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
         return best;
       }catch(_){ return null; }
     }
 
-    /* Ensure Module arrays exist before openttd.js uses them */
+    /* ---------- Ensure Module arrays exist before openttd.js uses them ---------- */
     (function(){
       var M = window.Module;
       if (!Array.isArray(M.preRun))     M.preRun = [];
@@ -222,164 +303,363 @@
       window.Module = M;
     })();
 
-    /* Mount IDB before game */
-    Module.preRun.push(function(){ return ensureIDBMounted().catch(()=>{}); });
+    /* Mount IDB before the game starts */
+    Module.preRun.push(function(){
+      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
+    });
 
-    /* ---------- First-run mobile GUI defaults (write BOTH paths, all variants) ---------- */
-    (function () {
-      const CFG_INIT_KEY   = 'openttd_cfg_initialized_v3';
-      const XDG_CFG_DIR    = '/home/web_user/.config/openttd';
-      const XDG_CFG_PATH   = XDG_CFG_DIR + '/openttd.cfg';
-      const LEG_CFG_DIR    = '/home/web_user/.openttd';
-      const LEG_CFG_PATH   = LEG_CFG_DIR + '/openttd.cfg';
+    /* ---------- First-run mobile GUI defaults (write BOTH config paths) ---------- */
+    (function(){
+      const CFG_INIT_KEY = 'openttd_cfg_initialized_v4';
+      const XDG_CFG_DIR  = '/home/web_user/.config/openttd';
+      const XDG_CFG_PATH = XDG_CFG_DIR + '/openttd.cfg';
+      const LEG_CFG_DIR  = '/home/web_user/.openttd';
+      const LEG_CFG_PATH = LEG_CFG_DIR + '/openttd.cfg';
 
-      function upsertCfgText(existing, {guiZoom,fontZoom,guiScale,smallGui}){
+      function upsertCfg(existing, zoom){
         let cfg = existing || '';
-        if (!/\n\[gui\]/i.test(cfg)) cfg += (cfg.endsWith('\n') ? '' : '\n') + '[gui]\n';
-        // remove any old keys
-        cfg = cfg.replace(/(^|\n)\s*(gui_zoom|font_zoom|gui_scale|small_gui)\s*=.*(?=\n)/ig, '');
-        // re-insert block with all variants to satisfy different builds
-        return cfg.replace(/\[gui\][^\[]*/i, m => (
-          (m.endsWith('\n') ? m : m+'\n') +
-          `gui_zoom = ${guiZoom}\n` +     /* percent (100–400) */
-          `font_zoom = ${fontZoom}\n` +   /* percent */
-          `gui_scale = ${guiScale}\n` +   /* step (1..4-ish) */
-          `small_gui = ${smallGui}\n`     /* legacy toggle */
-        ));
+        if (!/\n\[gui\]/i.test(cfg)) cfg += (cfg.endsWith('\n')?'':'\n') + '[gui]\n';
+        cfg = cfg.replace(/(^|\n)\s*(gui_zoom|font_zoom)\s*=.*(?=\n)/ig,'');
+        return cfg.replace(/\[gui\][^\[]*/i, m => (m.endsWith('\n')?m:m+'\n') +
+          `gui_zoom = ${zoom}\nfont_zoom = ${zoom}\n`);
       }
 
-      async function ensureMobileGuiDefaults() {
-        try {
+      async function apply(){
+        try{
           if (localStorage.getItem(CFG_INIT_KEY) === '1') return;
 
           const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
           if (!isTouch) return;
 
           const vw = Math.min(window.innerWidth, window.innerHeight);
-          const guiZoom  = (vw <= 820 ? 200 : (vw <= 1080 ? 175 : 150));
-          const fontZoom = guiZoom;
-          const guiScale = Math.max(1, Math.round(guiZoom / 100)); // 150->2, 175->2, 200->2
-          const smallGui = 'false';
+          const zoom = (vw <= 820 ? 225 : (vw <= 1080 ? 200 : 175));
 
           await ensureIDBMounted();
 
           mkdirp(XDG_CFG_DIR);
-          let xdgText = ''; try { xdgText = FS.readFile(XDG_CFG_PATH, {encoding:'utf8'}); } catch(_){}
-          FS.writeFile(XDG_CFG_PATH, upsertCfgText(xdgText, {guiZoom,fontZoom,guiScale,smallGui}));
+          let xdg=''; try{ xdg=FS.readFile(XDG_CFG_PATH,{encoding:'utf8'});}catch(_){}
+          FS.writeFile(XDG_CFG_PATH, upsertCfg(xdg, zoom));
 
           mkdirp(LEG_CFG_DIR);
-          let legText = ''; try { legText = FS.readFile(LEG_CFG_PATH, {encoding:'utf8'}); } catch(_){}
-          FS.writeFile(LEG_CFG_PATH, upsertCfgText(legText, {guiZoom,fontZoom,guiScale,smallGui}));
+          let leg=''; try{ leg=FS.readFile(LEG_CFG_PATH,{encoding:'utf8'});}catch(_){}
+          FS.writeFile(LEG_CFG_PATH, upsertCfg(leg, zoom));
 
           await persistToIDB();
-          localStorage.setItem(CFG_INIT_KEY, '1');
-          console.log('[OpenTTD] Wrote GUI defaults to both cfg paths', {XDG_CFG_PATH, LEG_CFG_PATH, guiZoom, fontZoom, guiScale});
-        } catch (e) {
-          console.warn('Failed to apply mobile GUI defaults', e);
-        }
+          localStorage.setItem(CFG_INIT_KEY,'1');
+          console.log('[OpenTTD] Wrote GUI defaults to both cfg paths', {XDG_CFG_PATH, LEG_CFG_PATH, zoom});
+        }catch(e){ console.warn('GUI defaults failed', e); }
       }
 
-      Module.preRun.push(function(){ return ensureMobileGuiDefaults(); });
+      Module.preRun.push(()=>apply());
     })();
 
-    /* ---------- Force the game to use our cfg ---------- */
+    /* ---------- Force the engine to use our XDG config ---------- */
     (function(){
       const XDG_CFG_PATH = '/home/web_user/.config/openttd/openttd.cfg';
       if (!Array.isArray(Module.arguments)) Module.arguments = [];
-      if (!Module.arguments.includes('-c')) Module.arguments.push('-c', XDG_CFG_PATH);
+      if (!Module.arguments.includes('-c')) {
+        Module.arguments.push('-c', XDG_CFG_PATH);
+      }
       console.log('[OpenTTD] Using cfg via -c', XDG_CFG_PATH);
     })();
 
-    /* Emscripten hooks and game events */
     Module.print   = (...a)=>console.log(a.join(' '));
     Module.printErr= (...a)=>console.error(a.join(' '));
-    Module.canvas = (()=>{ var e=document.getElementById("canvas"); e.addEventListener("webglcontextlost",ev=>{ alert("WebGL context lost. Reload the page."); ev.preventDefault();},false); return e; })();
-    Module.setStatus = function(e){ const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/); if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`; document.getElementById("message").innerHTML = e || ''; if(e==='Running...') showGameUI(); };
-    Module.monitorRunDependencies = function(e){ if(e<Module.lastDependencies) Module.doneDependencies++; Module.lastDependencies=e; const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total); document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`; document.getElementById("message").textContent = "Preparing game ..."; };
-    Module.onBootstrap=(bytes,total)=>{ document.getElementById("canvas").style.display="none"; showOverlay("Missing base graphics",`${bytes} / ${total} bytes`); };
-    Module.onBootstrapFailed=()=>{ document.getElementById("canvas").style.display="none"; showOverlay("Missing base graphics","Failed to download."); };
-    Module.onBootstrapReload=()=>{ document.getElementById("canvas").style.display="none"; showOverlay("Missing base graphics","Download complete. Reloading…"); };
-    Module.onExit=()=>{ document.getElementById("canvas").style.display="none"; showOverlay("Thank you for playing!","Reload to restart."); };
-    Module.onAbort=()=>{ document.getElementById("canvas").style.display="none"; document.getElementById("box").className="error"; showOverlay("Crash :(","Reload to restart."); };
-    Module.onWarningFs=()=>{ const fsEl=document.getElementById('filesystem'); fsEl.style.display='inline-block'; const ov=document.getElementById('overlay'); ov.style.opacity=1; setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000); };
+
+    Module.canvas = (()=>{
+      var e=document.getElementById("canvas");
+      e.addEventListener("webglcontextlost",ev=>{
+        alert("WebGL context lost. Reload the page."); ev.preventDefault();
+      },false);
+      return e;
+    })();
+
+    Module.setStatus = function(e){
+      const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+      if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`;
+      document.getElementById("message").innerHTML = e || '';
+      if(e==='Running...') showGameUI();
+    };
+    Module.monitorRunDependencies = function(e){
+      if(e<Module.lastDependencies) Module.doneDependencies++;
+      Module.lastDependencies=e;
+      const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total);
+      document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`;
+      document.getElementById("message").textContent = "Preparing game ...";
+    };
+
+    Module.onBootstrap=(bytes,total)=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics",`OpenTTD is downloading base graphics.<br><br>${bytes} / ${total} bytes downloaded.`);
+    };
+    Module.onBootstrapFailed=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Failed to download base graphics.<br>The game cannot start without them.<br><br>Check your connection and reload.");
+    };
+    Module.onBootstrapReload=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Download complete.<br>Your browser will reload shortly.");
+    };
+    Module.onExit=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Thank you for playing!","Reload your browser to restart.");
+    };
+    Module.onAbort=()=>{
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("box").className="error";
+      showOverlay("Crash :(","The game crashed! Reload to restart.");
+    };
+
+    const _onWarningFsImpl=()=>{
+      const fsEl=document.getElementById('filesystem');
+      fsEl.style.display='inline-block';
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=1;
+      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
+    };
+    Module.onWarningFs=_onWarningFsImpl;
     Module.onRuntimeInitialized=()=>showGameUI();
     Module.postRun.push(showGameUI);
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
-    /* Mobile-friendly export helpers (unchanged)… */
-    function openBlobURLInNewContext(url){ const win=window.open(url,'_blank','noopener'); if(!win){ const a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener'; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);} }
-    async function shareOrDownload(name,data,type='application/octet-stream',preferOpen=false){ try{ const file=new File([data],name,{type}); if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'OpenTTD export',text:name}); return; } }catch(_){} const url=URL.createObjectURL(new Blob([data],{type})); if(preferOpen) openBlobURLInNewContext(url); else { const a=document.createElement('a'); a.href=url; a.download=name; a.rel='noopener'; document.body.appendChild(a); a.click(); setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0); } setTimeout(()=>URL.revokeObjectURL(url),15000); }
-    function downloadBinary(name,data,type='application/octet-stream'){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([data],{type})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),100); }
+    /* ---------- Visual upscaler for touch (CSS transform) ---------- */
+    (function(){
+      function isTouch(){ return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window); }
+      const TOUCH_UI_SCALE = 1.8;
 
-    async function exportSave(){ try{ const name=newestByMtime(SAVE_DIR,['.sav']); if(!name){alert('No .sav found in '+SAVE_DIR);return;} const data=FS.readFile(SAVE_DIR+name); await shareOrDownload(name,data,'application/octet-stream',true); }catch(e){alert('Export failed: '+e.message);} }
-    async function importSave(){ const input=document.createElement('input'); input.type='file'; input.accept='.sav'; input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none'; document.body.appendChild(input); input.onchange=async e=>{ const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; } const buf=await f.arrayBuffer(); try{ await ensureIDBMounted(); mkdirp(SAVE_DIR); mkdirp(IDB_MIRROR + '/save/'); FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf)); FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf)); await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res())); alert('Imported:\n' + SAVE_DIR+f.name); }catch(err){console.error(err); alert('Import failed: '+err.message);} finally{ try{ document.body.removeChild(input);}catch(_){}} }; input.click(); }
-    async function exportScenario(){ try{ const name=newestByMtime(SCEN_DIR,['.scn']); if(!name){alert('No .scn found in '+SCEN_DIR);return;} const data=FS.readFile(SCEN_DIR+name); await shareOrDownload(name,data,'application/octet-stream',true); }catch(e){alert('Export failed: '+e.message);} }
-    async function importScenario(){ const input=document.createElement('input'); input.type='file'; input.accept='.scn'; input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none'; document.body.appendChild(input); input.onchange=async e=>{ const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; } const buf=await f.arrayBuffer(); try{ await ensureIDBMounted(); mkdirp(SCEN_DIR); mkdirp(IDB_MIRROR + '/scenario/'); FS.writeFile(SCEN_DIR + f.name, new Uint8Array(buf)); FS.writeFile(IDB_MIRROR + '/scenario/' + f.name, new Uint8Array(buf)); await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res())); alert('Imported scenario:\n' + SCEN_DIR+f.name); }catch(err){console.error(err); alert('Import failed: '+err.message);} finally{ try{ document.body.removeChild(input);}catch(_){}} }; input.click(); }
-    async function exportHeightmap(){ try{ const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']); if(!name){alert('No heightmap found in '+HEIGHT_DIR);return;} const data=FS.readFile(HEIGHT_DIR+name); const type=name.toLowerCase().endsWith('.png')?'image/png':name.toLowerCase().endsWith('.bmp')?'image/bmp':'application/octet-stream'; await shareOrDownload(name,data,type,true); }catch(e){alert('Export failed: '+e.message);} }
-    async function importHeightmap(){ const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp'; input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none'; document.body.appendChild(input); input.onchange=async e=>{ const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; } const buf=await f.arrayBuffer(); try{ await ensureIDBMounted(); mkdirp(HEIGHT_DIR); mkdirp(IDB_MIRROR + '/scenario/heightmap/'); FS.writeFile(HEIGHT_DIR + f.name, new Uint8Array(buf)); FS.writeFile(IDB_MIRROR + '/scenario/heightmap/' + f.name, new Uint8Array(buf)); await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res())); alert('Imported heightmap:\n' + HEIGHT_DIR+f.name + '\nLoad via Scenario Editor → Heightmap.'); }catch(err){console.error(err); alert('Import failed: '+err.message);} finally{ try{ document.body.removeChild(input);}catch(_){}} }; input.click(); }
+      function updateCanvasScale() {
+        const canvas = document.getElementById('canvas');
+        if (!canvas) return;
+
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        const scale = isTouch() ? TOUCH_UI_SCALE : 1.0;
+        const backingW = Math.max(1, Math.floor((vw * dpr) / scale));
+        const backingH = Math.max(1, Math.floor((vh * dpr) / scale));
+
+        canvas.width  = backingW;
+        canvas.height = backingH;
+        canvas.style.width  = vw + 'px';
+        canvas.style.height = vh + 'px';
+        canvas.style.transformOrigin = 'top left';
+        canvas.style.transform = `scale(${scale})`;
+
+        if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+          Module.setCanvasSize(backingW, backingH, false);
+        }
+
+        // Enable soft keyboard focus
+        canvas.tabIndex = 1;
+        canvas.addEventListener('click', () => canvas.focus(), { once: true });
+      }
+
+      window.addEventListener('resize', updateCanvasScale);
+      window.addEventListener('orientationchange', updateCanvasScale);
+      document.addEventListener('DOMContentLoaded', updateCanvasScale);
+      updateCanvasScale();
+    })();
+
+    /* ---------- Mobile-friendly export helpers ---------- */
+    function openBlobURLInNewContext(url){
+      const win = window.open(url, '_blank', 'noopener');
+      if (!win) {
+        const a=document.createElement('a');
+        a.href=url; a.target='_blank'; a.rel='noopener';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
+      }
+    }
+
+    async function shareOrDownload(name, data, type='application/octet-stream', preferOpen=false){
+      try{
+        const file = new File([data], name, { type });
+        if (navigator.canShare && navigator.canShare({ files:[file] })) {
+          await navigator.share({ files:[file], title: 'OpenTTD export', text: name });
+          return;
+        }
+      }catch(_){} // ignore and fallback
+
+      const url = URL.createObjectURL(new Blob([data],{type}));
+      if (preferOpen) openBlobURLInNewContext(url);
+      else {
+        const a=document.createElement('a');
+        a.href=url; a.download=name; a.rel='noopener';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
+      }
+      setTimeout(()=>URL.revokeObjectURL(url), 15000);
+    }
+
+    function downloadBinary(name, data, type='application/octet-stream'){
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([data],{type}));
+      a.download=name; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),100);
+    }
+
+    /* ---------- Save import/export (live + persistent mirror) ---------- */
+    async function exportSave(){
+      try{
+        const name=newestByMtime(SAVE_DIR,['.sav']);
+        if(!name){alert('No .sav found in '+SAVE_DIR);return;}
+        const data=FS.readFile(SAVE_DIR+name);
+        await shareOrDownload(name, data, 'application/octet-stream', true);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importSave(){
+      const input=document.createElement('input');
+      input.type='file'; input.accept='.sav';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(SAVE_DIR); mkdirp(IDB_MIRROR + '/save/');
+          FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));                 // live
+          FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));    // persistent
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
+      input.click();
+    }
+
+    /* ---------- Scenario import/export ---------- */
+    async function exportScenario(){
+      try{
+        const name=newestByMtime(SCEN_DIR,['.scn']);
+        if(!name){alert('No .scn found in '+SCEN_DIR);return;}
+        const data=FS.readFile(SCEN_DIR+name);
+        await shareOrDownload(name, data, 'application/octet-stream', true);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importScenario(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.scn';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(SCEN_DIR); mkdirp(IDB_MIRROR + '/scenario/');
+          FS.writeFile(SCEN_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
+      input.click();
+    }
+
+    /* ---------- Heightmap import/export ---------- */
+    async function exportHeightmap(){
+      try{
+        const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
+        if(!name){alert('No heightmap (.png or .bmp) found in '+HEIGHT_DIR);return;}
+        const data=FS.readFile(HEIGHT_DIR+name);
+        const type = name.toLowerCase().endsWith('.png') ? 'image/png'
+                   : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
+                   : 'application/octet-stream';
+        await shareOrDownload(name, data, type, true);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importHeightmap(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(HEIGHT_DIR); mkdirp(IDB_MIRROR + '/scenario/heightmap/');
+          FS.writeFile(HEIGHT_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/heightmap/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
+      input.click();
+    }
   </script>
 
   <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
-  <!-- Visual UI upscaler for touch -->
-  <script>
-  (function () {
-    function isTouch(){ return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window); }
-    const TOUCH_UI_SCALE = 1.8;
-
-    function updateCanvasScale() {
-      const canvas = document.getElementById('canvas');
-      if (!canvas) return;
-      const dpr = Math.max(1, window.devicePixelRatio || 1);
-      const vw = window.innerWidth, vh = window.innerHeight;
-      const renderScale = isTouch() ? TOUCH_UI_SCALE : 1.0;
-      const backingW = Math.max(1, Math.floor((vw * dpr) / renderScale));
-      const backingH = Math.max(1, Math.floor((vh * dpr) / renderScale));
-      canvas.width = backingW; canvas.height = backingH;
-      canvas.style.width = vw + 'px'; canvas.style.height = vh + 'px';
-      if (typeof Module !== 'undefined' && Module.setCanvasSize) Module.setCanvasSize(backingW, backingH, false);
-      canvas.tabIndex = 1; canvas.addEventListener('click', () => canvas.focus(), { once: true });
-    }
-    window.addEventListener('resize', updateCanvasScale);
-    window.addEventListener('orientationchange', updateCanvasScale);
-    document.addEventListener('DOMContentLoaded', updateCanvasScale);
-    updateCanvasScale();
-  })();
-  </script>
-
-  <!-- Pinch-zoom -->
+  <!-- Pinch zoom handler -->
   <script>
   (function(){
-    const SENSITIVITY = 0.2;
+    const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+
     function attach(){
       const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
       if (!canvas) return false;
-      canvas.style.touchAction='none'; canvas.style.cursor='none';
-      let pA=null,pB=null,last=0;
-      function pinchDist(a,b){ return Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY); }
-      canvas.addEventListener('touchstart', e=>{ if(e.touches.length===2){ e.preventDefault(); pA=e.touches[0]; pB=e.touches[1]; last=pinchDist(pA,pB);} }, {passive:false});
-      canvas.addEventListener('touchmove', e=>{
-        if(e.touches.length!==2) return;
-        e.preventDefault();
-        const t1=e.touches[0], t2=e.touches[1], d=pinchDist(t1,t2), s=d/last;
-        if(Math.abs(s-1)>0.01){
-          const cx=(t1.clientX+t2.clientX)/2, cy=(t1.clientY+t2.clientY)/2;
-          const delta=(Math.log(s)/Math.log(1.05))*120*SENSITIVITY;
-          canvas.dispatchEvent(new WheelEvent('wheel',{deltaY:-delta, clientX:cx, clientY:cy, bubbles:true}));
-          last=d;
+
+      canvas.style.touchAction = 'none';
+      canvas.style.cursor = 'none';
+
+      let pA = null, pB = null;
+      let lastDist = 0;
+
+      function pinchDist(t1, t2){
+        return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      }
+
+      canvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 2){
+          e.preventDefault();
+          pA = e.touches[0];
+          pB = e.touches[1];
+          lastDist = pinchDist(pA, pB);
         }
       }, {passive:false});
-      canvas.addEventListener('touchend', e=>{ if(e.touches.length<2) pA=pB=null; }, {passive:false});
-      canvas.addEventListener('touchcancel', ()=>{ pA=pB=null; }, {passive:false});
+
+      canvas.addEventListener('touchmove', e => {
+        if (e.touches.length !== 2) return;
+        e.preventDefault();
+
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const dist = pinchDist(t1, t2);
+        const scale = dist / lastDist;
+
+        if (Math.abs(scale - 1) > 0.01) {
+          const cx = (t1.clientX + t2.clientX) / 2;
+          const cy = (t1.clientY + t2.clientY) / 2;
+
+          const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+          canvas.dispatchEvent(new WheelEvent('wheel', {
+            deltaY: -delta,
+            clientX: cx,
+            clientY: cy,
+            bubbles: true
+          }));
+          lastDist = dist;
+        }
+      }, {passive:false});
+
+      canvas.addEventListener('touchend', e => {
+        if (e.touches.length < 2) pA = pB = null;
+      }, {passive:false});
+
+      canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+
       return true;
     }
-    if(!attach()){
-      const prev=(window.Module&&Module.onRuntimeInitialized)||null;
-      window.Module=window.Module||{};
-      Module.onRuntimeInitialized=function(){ if(prev) prev(); attach(); };
-      window.addEventListener('load', ()=>setTimeout(attach,0));
+
+    if (!attach()){
+      const prev = (window.Module && Module.onRuntimeInitialized) || null;
+      window.Module = window.Module || {};
+      Module.onRuntimeInitialized = function(){
+        if (prev) prev();
+        attach();
+      };
+      window.addEventListener('load', () => setTimeout(attach, 0));
     }
   })();
   </script>
