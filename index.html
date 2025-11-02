@@ -81,7 +81,6 @@
     background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
     user-select:none;backdrop-filter:blur(2px);
     opacity:0;animation:fadeIn 0.4s ease forwards 0.3s;
-    -webkit-tap-highlight-color: transparent;
   }
   @keyframes fadeIn { to { opacity:1; } }
   #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
@@ -149,7 +148,7 @@
     /* --- Paths --- */
     const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
-    the SCEN_DIR   = LIVE_ROOT + '/scenario/';
+    const SCEN_DIR   = LIVE_ROOT + '/scenario/';   /* <-- fixed */
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
 
     const IDB_ROOT   = '/idb';
@@ -314,7 +313,7 @@
 
     /* ---------- First-run mobile GUI defaults (writes gui_scale + zooms) ---------- */
     (function(){
-      const CFG_INIT_KEY = 'openttd_cfg_initialized_v6';   // bumped so it reapplies once
+      const CFG_INIT_KEY = 'openttd_cfg_initialized_v6';
       const XDG_CFG_DIR  = '/home/web_user/.config/openttd';
       const XDG_CFG_PATH = XDG_CFG_DIR + '/openttd.cfg';
       const LEG_CFG_DIR  = '/home/web_user/.openttd';
@@ -323,9 +322,7 @@
       function upsertGui(existing, scale){
         let cfg = existing || '';
         if (!/\n\[gui\]/i.test(cfg)) cfg += (cfg.endsWith('\n')?'':'\n') + '[gui]\n';
-        // remove old keys
         cfg = cfg.replace(/(^|\n)\s*(gui_scale|gui_zoom|font_zoom)\s*=.*(?=\n)/ig,'');
-        // insert fresh values
         return cfg.replace(/\[gui\][^\[]*/i, m => {
           const nl = m.endsWith('\n') ? '' : '\n';
           return m + nl +
@@ -377,13 +374,7 @@
     Module.print   = (...a)=>console.log(a.join(' '));
     Module.printErr= (...a)=>console.error(a.join(' '));
 
-    Module.canvas = (()=>{
-      var e=document.getElementById("canvas");
-      e.addEventListener("webglcontextlost",ev=>{
-        alert("WebGL context lost. Reload the page."); ev.preventDefault();
-      },false);
-      return e;
-    })();
+    Module.canvas = (()=>{var e=document.getElementById("canvas");e.addEventListener("webglcontextlost",ev=>{alert("WebGL context lost. Reload the page."); ev.preventDefault();},false);return e;})();
 
     Module.setStatus = function(e){
       const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
@@ -437,7 +428,7 @@
     /* ---------- Sticky backing-resolution upscaler (no CSS transforms) ---------- */
     (function () {
       function isTouch(){ return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window); }
-      const TOUCH_RENDER_SCALE = 2.2; // bump to make UI larger on tablets
+      const TOUCH_RENDER_SCALE = 2.2;
 
       function desiredBackingSize(vw, vh, dpr){
         const s = isTouch() ? TOUCH_RENDER_SCALE : 1.0;
@@ -481,7 +472,6 @@
       document.addEventListener('DOMContentLoaded', ()=>{ applyCanvasScale(); watchCanvas(); });
       window.addEventListener('load', ()=> setTimeout(()=>{ applyCanvasScale(); watchCanvas(); }, 0));
 
-      // re-assert a few times after start (some builds resize late)
       let n=0; const tick=setInterval(()=>{ applyCanvasScale(); if(++n>20) clearInterval(tick); }, 250);
     })();
 
