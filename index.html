@@ -53,12 +53,12 @@
     padding:8px 10px;
     backdrop-filter:blur(2px);
     display:none; /* hidden by default */
-    flex-direction:column-reverse !important; /* first item closest to toggle */
+    flex-direction:column-reverse !important;
     gap:6px !important;
     width:180px !important;
     min-width:160px !important;
     box-sizing:border-box;
-    transform-origin:bottom right; /* anchor near toggle */
+    transform-origin:bottom right;
     -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
@@ -148,11 +148,15 @@
     /* --- Paths --- */
     const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
-    const SCEN_DIR   = LIVE_ROOT + '/scenario/';   /* <-- fixed */
+    const SCEN_DIR   = LIVE_ROOT + '/scenario/';
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
 
-    const IDB_ROOT   = '/idb';
-    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
+    /* NEW: XDG data path where basesets are stored */
+    const XDG_DATA_ROOT   = '/home/web_user/.local/share/openttd';
+
+    const IDB_ROOT        = '/idb';
+    const IDB_MIRROR      = IDB_ROOT + LIVE_ROOT;        // mirror for config/home
+    const IDB_MIRROR_DATA = IDB_ROOT + XDG_DATA_ROOT;    // mirror for baseset data
 
     /* UI refs */
     const toolbar   = document.getElementById('toolbar');
@@ -198,7 +202,7 @@
       if (logo) logo.style.opacity=1;
     }
 
-    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
+    /* ---------- IDBFS helpers ---------- */
     let __idbReady = false;
 
     function mkdirp(path){
@@ -230,23 +234,35 @@
       }
     }
 
+    /* UPDATED: mount + restore both mirrors (config + baseset data) */
     function ensureIDBMounted() {
       return new Promise((resolve, reject) => {
         try {
           if (__idbReady) return resolve();
           mkdirp(IDB_ROOT);
+
           let mounted = false;
           try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
-          if (!mounted) {
-            FS.mount(IDBFS, {}, IDB_ROOT);
-          }
+          if (!mounted) FS.mount(IDBFS, {}, IDB_ROOT);
+
           FS.syncfs(true, (err) => {
             if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
             __idbReady = true;
-            if (exists(IDB_MIRROR)) {
-              mkdirp(LIVE_ROOT);
-              copyTree(IDB_MIRROR, LIVE_ROOT);
-            }
+
+            try {
+              if (exists(IDB_MIRROR)) {
+                mkdirp(LIVE_ROOT);
+                copyTree(IDB_MIRROR, LIVE_ROOT);
+              }
+            } catch(e){ console.warn('Restore LIVE_ROOT failed', e); }
+
+            try {
+              if (exists(IDB_MIRROR_DATA)) {
+                mkdirp(XDG_DATA_ROOT);
+                copyTree(IDB_MIRROR_DATA, XDG_DATA_ROOT);
+              }
+            } catch(e){ console.warn('Restore XDG_DATA_ROOT failed', e); }
+
             resolve();
           });
         } catch (e) {
@@ -256,11 +272,16 @@
       });
     }
 
+    /* UPDATED: persist both mirrors on save */
     function persistToIDB() {
       return new Promise((resolve, reject) => {
         try {
           mkdirp(IDB_MIRROR);
-          copyTree(LIVE_ROOT, IDB_MIRROR);
+          try { copyTree(LIVE_ROOT, IDB_MIRROR); } catch(e){ console.warn('Mirror LIVE_ROOT failed', e); }
+
+          mkdirp(IDB_MIRROR_DATA);
+          try { copyTree(XDG_DATA_ROOT, IDB_MIRROR_DATA); } catch(e){ /* may not exist yet */ }
+
           FS.syncfs(false, (err) => err ? reject(err) : resolve());
         } catch (e) { reject(e); }
       });
