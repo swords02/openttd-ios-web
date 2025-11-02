@@ -32,7 +32,6 @@
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
   #canvas{
     width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative;
-    /* crisp pixels when we render at a reduced backing size */
     image-rendering: pixelated;
     image-rendering: crisp-edges;
   }
@@ -150,7 +149,7 @@
     /* --- Paths --- */
     const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
-    const SCEN_DIR   = LIVE_ROOT + '/scenario/';
+    the SCEN_DIR   = LIVE_ROOT + '/scenario/';
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
 
     const IDB_ROOT   = '/idb';
@@ -313,20 +312,27 @@
       return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
     });
 
-    /* ---------- First-run mobile GUI defaults (write BOTH config paths) ---------- */
+    /* ---------- First-run mobile GUI defaults (writes gui_scale + zooms) ---------- */
     (function(){
-      const CFG_INIT_KEY = 'openttd_cfg_initialized_v4';
+      const CFG_INIT_KEY = 'openttd_cfg_initialized_v6';   // bumped so it reapplies once
       const XDG_CFG_DIR  = '/home/web_user/.config/openttd';
       const XDG_CFG_PATH = XDG_CFG_DIR + '/openttd.cfg';
       const LEG_CFG_DIR  = '/home/web_user/.openttd';
       const LEG_CFG_PATH = LEG_CFG_DIR + '/openttd.cfg';
 
-      function upsertCfg(existing, zoom){
+      function upsertGui(existing, scale){
         let cfg = existing || '';
         if (!/\n\[gui\]/i.test(cfg)) cfg += (cfg.endsWith('\n')?'':'\n') + '[gui]\n';
-        cfg = cfg.replace(/(^|\n)\s*(gui_zoom|font_zoom)\s*=.*(?=\n)/ig,'');
-        return cfg.replace(/\[gui\][^\[]*/i, m => (m.endsWith('\n')?m:m+'\n') +
-          `gui_zoom = ${zoom}\nfont_zoom = ${zoom}\n`);
+        // remove old keys
+        cfg = cfg.replace(/(^|\n)\s*(gui_scale|gui_zoom|font_zoom)\s*=.*(?=\n)/ig,'');
+        // insert fresh values
+        return cfg.replace(/\[gui\][^\[]*/i, m => {
+          const nl = m.endsWith('\n') ? '' : '\n';
+          return m + nl +
+            `gui_scale = ${scale}\n` +
+            `gui_zoom  = ${scale}\n` +
+            `font_zoom = ${scale}\n`;
+        });
       }
 
       async function apply(){
@@ -337,21 +343,21 @@
           if (!isTouch) return;
 
           const vw = Math.min(window.innerWidth, window.innerHeight);
-          const zoom = (vw <= 820 ? 225 : (vw <= 1080 ? 200 : 175));
+          const scale = (vw <= 820 ? 225 : (vw <= 1080 ? 200 : 175));
 
           await ensureIDBMounted();
 
           mkdirp(XDG_CFG_DIR);
           let xdg=''; try{ xdg=FS.readFile(XDG_CFG_PATH,{encoding:'utf8'});}catch(_){}
-          FS.writeFile(XDG_CFG_PATH, upsertCfg(xdg, zoom));
+          FS.writeFile(XDG_CFG_PATH, upsertGui(xdg, scale));
 
           mkdirp(LEG_CFG_DIR);
           let leg=''; try{ leg=FS.readFile(LEG_CFG_PATH,{encoding:'utf8'});}catch(_){}
-          FS.writeFile(LEG_CFG_PATH, upsertCfg(leg, zoom));
+          FS.writeFile(LEG_CFG_PATH, upsertGui(leg, scale));
 
           await persistToIDB();
           localStorage.setItem(CFG_INIT_KEY,'1');
-          console.log('[OpenTTD] Wrote GUI defaults to both cfg paths', {XDG_CFG_PATH, LEG_CFG_PATH, zoom});
+          console.log('[OpenTTD] Set gui_scale/gui_zoom/font_zoom to', scale);
         }catch(e){ console.warn('GUI defaults failed', e); }
       }
 
@@ -428,11 +434,18 @@
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
-    /* ---------- Visual UI upscaler for touch (backing-resolution scaling; no CSS transforms) ---------- */
+    /* ---------- Sticky backing-resolution upscaler (no CSS transforms) ---------- */
     (function () {
       function isTouch(){ return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window); }
-      /* Increase to make the UI bigger on touch devices (try 1.6–2.2). */
-      const TOUCH_RENDER_SCALE = 1.8;
+      const TOUCH_RENDER_SCALE = 2.2; // bump to make UI larger on tablets
+
+      function desiredBackingSize(vw, vh, dpr){
+        const s = isTouch() ? TOUCH_RENDER_SCALE : 1.0;
+        return {
+          w: Math.max(1, Math.floor(vw * dpr / s)),
+          h: Math.max(1, Math.floor(vh * dpr / s)),
+        };
+      }
 
       function applyCanvasScale() {
         const canvas = document.getElementById('canvas');
@@ -441,35 +454,35 @@
         const vw = window.innerWidth;
         const vh = window.innerHeight;
         const dpr = Math.max(1, window.devicePixelRatio || 1);
+        const { w, h } = desiredBackingSize(vw, vh, dpr);
 
-        /* On touch, render at a smaller backing size (bigger-looking UI). */
-        const scale = isTouch() ? TOUCH_RENDER_SCALE : 1.0;
-        const backingW = Math.max(1, Math.floor(vw * dpr / scale));
-        const backingH = Math.max(1, Math.floor(vh * dpr / scale));
-
-        // Backing (actual GL) size
-        canvas.width  = backingW;
-        canvas.height = backingH;
-
-        // CSS (display) size — always fill the viewport
-        canvas.style.width  = vw + 'px';
-        canvas.style.height = vh + 'px';
-
-        // Let Emscripten/SDL know we resized the render target
-        if (typeof Module !== 'undefined' && Module.setCanvasSize) {
-          try { Module.setCanvasSize(backingW, backingH, false); } catch (_) {}
+        if (canvas.width !== w || canvas.height !== h) {
+          canvas.width  = w;
+          canvas.height = h;
+          if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+            try { Module.setCanvasSize(w, h, false); } catch (_) {}
+          }
         }
 
-        // Keyboard focus for soft keyboard
+        canvas.style.width  = vw + 'px';
+        canvas.style.height = vh + 'px';
         canvas.tabIndex = 1;
-        canvas.addEventListener('click', () => canvas.focus(), { once: true });
+      }
+
+      function watchCanvas(){
+        const c = document.getElementById('canvas');
+        if (!c || window.__uiScaleWatcher) return;
+        window.__uiScaleWatcher = new ResizeObserver(()=>applyCanvasScale());
+        window.__uiScaleWatcher.observe(c);
       }
 
       window.addEventListener('resize', applyCanvasScale);
       window.addEventListener('orientationchange', applyCanvasScale);
-      document.addEventListener('DOMContentLoaded', applyCanvasScale);
-      window.addEventListener('load', () => setTimeout(applyCanvasScale, 0));
-      applyCanvasScale();
+      document.addEventListener('DOMContentLoaded', ()=>{ applyCanvasScale(); watchCanvas(); });
+      window.addEventListener('load', ()=> setTimeout(()=>{ applyCanvasScale(); watchCanvas(); }, 0));
+
+      // re-assert a few times after start (some builds resize late)
+      let n=0; const tick=setInterval(()=>{ applyCanvasScale(); if(++n>20) clearInterval(tick); }, 250);
     })();
 
     /* ---------- Mobile-friendly export helpers ---------- */
