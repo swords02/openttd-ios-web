@@ -363,6 +363,13 @@
       Module.preRun.push(function(){ return ensureMobileGuiDefaults(); });
     })();
 
+    /* ---------- FORCE game to load our config: -c ~/.config/openttd/openttd.cfg ---------- */
+    (function(){
+      const XDG_CFG_PATH = '/home/web_user/.config/openttd/openttd.cfg';
+      if (!Array.isArray(Module.arguments)) Module.arguments = [];
+      if (!Module.arguments.includes('-c')) Module.arguments.push('-c', XDG_CFG_PATH);
+    })();
+
     Module.print   = (...a)=>console.log(a.join(' '));
     Module.printErr= (...a)=>console.error(a.join(' '));
 
@@ -553,9 +560,12 @@
   <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
-  <!-- 🔧 Auto-scale UI for mobile / high-DPI displays -->
+  <!-- 🔧 Auto-scale UI for mobile / high-DPI displays (adds visual upscaler on touch) -->
   <script>
   (function () {
+    function isTouch(){return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);}
+    const TOUCH_UI_SCALE = 1.8; // bump for iPad/phones
+
     function updateCanvasScale() {
       const canvas = document.getElementById('canvas');
       if (!canvas) return;
@@ -564,11 +574,10 @@
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // Smaller logical width => larger UI on phones
-      const targetLogicalWidth = (vw < 768) ? 960 : 1280;
-
-      const backingW = Math.floor(vw * dpr);
-      const backingH = Math.floor(vh * dpr);
+      // Render at fewer backing pixels on touch, then upscale in CSS.
+      const renderScale = isTouch() ? TOUCH_UI_SCALE : 1.0;
+      const backingW = Math.max(1, Math.floor((vw * dpr) / renderScale));
+      const backingH = Math.max(1, Math.floor((vh * dpr) / renderScale));
 
       canvas.width  = backingW;
       canvas.height = backingH;
