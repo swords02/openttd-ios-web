@@ -30,7 +30,12 @@
 
 <style>
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
-  #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
+  #canvas{
+    width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative;
+    /* crisp pixels when we render at a reduced backing size */
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+  }
 
   /* Overlay + loading */
   #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
@@ -423,43 +428,48 @@
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
-    /* ---------- Visual upscaler for touch (CSS transform) ---------- */
-    (function(){
+    /* ---------- Visual UI upscaler for touch (backing-resolution scaling; no CSS transforms) ---------- */
+    (function () {
       function isTouch(){ return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window); }
-      const TOUCH_UI_SCALE = 1.8;
+      /* Increase to make the UI bigger on touch devices (try 1.6–2.2). */
+      const TOUCH_RENDER_SCALE = 1.8;
 
-      function updateCanvasScale() {
+      function applyCanvasScale() {
         const canvas = document.getElementById('canvas');
         if (!canvas) return;
 
-        const dpr = Math.max(1, window.devicePixelRatio || 1);
         const vw = window.innerWidth;
         const vh = window.innerHeight;
+        const dpr = Math.max(1, window.devicePixelRatio || 1);
 
-        const scale = isTouch() ? TOUCH_UI_SCALE : 1.0;
-        const backingW = Math.max(1, Math.floor((vw * dpr) / scale));
-        const backingH = Math.max(1, Math.floor((vh * dpr) / scale));
+        /* On touch, render at a smaller backing size (bigger-looking UI). */
+        const scale = isTouch() ? TOUCH_RENDER_SCALE : 1.0;
+        const backingW = Math.max(1, Math.floor(vw * dpr / scale));
+        const backingH = Math.max(1, Math.floor(vh * dpr / scale));
 
+        // Backing (actual GL) size
         canvas.width  = backingW;
         canvas.height = backingH;
+
+        // CSS (display) size — always fill the viewport
         canvas.style.width  = vw + 'px';
         canvas.style.height = vh + 'px';
-        canvas.style.transformOrigin = 'top left';
-        canvas.style.transform = `scale(${scale})`;
 
+        // Let Emscripten/SDL know we resized the render target
         if (typeof Module !== 'undefined' && Module.setCanvasSize) {
-          Module.setCanvasSize(backingW, backingH, false);
+          try { Module.setCanvasSize(backingW, backingH, false); } catch (_) {}
         }
 
-        // Enable soft keyboard focus
+        // Keyboard focus for soft keyboard
         canvas.tabIndex = 1;
         canvas.addEventListener('click', () => canvas.focus(), { once: true });
       }
 
-      window.addEventListener('resize', updateCanvasScale);
-      window.addEventListener('orientationchange', updateCanvasScale);
-      document.addEventListener('DOMContentLoaded', updateCanvasScale);
-      updateCanvasScale();
+      window.addEventListener('resize', applyCanvasScale);
+      window.addEventListener('orientationchange', applyCanvasScale);
+      document.addEventListener('DOMContentLoaded', applyCanvasScale);
+      window.addEventListener('load', () => setTimeout(applyCanvasScale, 0));
+      applyCanvasScale();
     })();
 
     /* ---------- Mobile-friendly export helpers ---------- */
