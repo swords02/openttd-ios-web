@@ -30,11 +30,7 @@
 
 <style>
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
-  #canvas{
-    width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative;
-    image-rendering: pixelated;
-    image-rendering: crisp-edges;
-  }
+  #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
 
   /* Overlay + loading */
   #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
@@ -53,12 +49,12 @@
     padding:8px 10px;
     backdrop-filter:blur(2px);
     display:none; /* hidden by default */
-    flex-direction:column-reverse !important;
+    flex-direction:column-reverse !important; /* first item closest to toggle */
     gap:6px !important;
     width:180px !important;
     min-width:160px !important;
     box-sizing:border-box;
-    transform-origin:bottom right;
+    transform-origin:bottom right; /* anchor near toggle */
     -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
@@ -81,6 +77,7 @@
     background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
     user-select:none;backdrop-filter:blur(2px);
     opacity:0;animation:fadeIn 0.4s ease forwards 0.3s;
+    -webkit-tap-highlight-color: transparent;
   }
   @keyframes fadeIn { to { opacity:1; } }
   #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
@@ -151,12 +148,8 @@
     const SCEN_DIR   = LIVE_ROOT + '/scenario/';
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
 
-    /* NEW: XDG data path where basesets are stored */
-    const XDG_DATA_ROOT   = '/home/web_user/.local/share/openttd';
-
-    const IDB_ROOT        = '/idb';
-    const IDB_MIRROR      = IDB_ROOT + LIVE_ROOT;        // mirror for config/home
-    const IDB_MIRROR_DATA = IDB_ROOT + XDG_DATA_ROOT;    // mirror for baseset data
+    const IDB_ROOT   = '/idb';
+    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
 
     /* UI refs */
     const toolbar   = document.getElementById('toolbar');
@@ -202,7 +195,7 @@
       if (logo) logo.style.opacity=1;
     }
 
-    /* ---------- IDBFS helpers ---------- */
+    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
     let __idbReady = false;
 
     function mkdirp(path){
@@ -234,35 +227,23 @@
       }
     }
 
-    /* UPDATED: mount + restore both mirrors (config + baseset data) */
     function ensureIDBMounted() {
       return new Promise((resolve, reject) => {
         try {
           if (__idbReady) return resolve();
           mkdirp(IDB_ROOT);
-
           let mounted = false;
           try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
-          if (!mounted) FS.mount(IDBFS, {}, IDB_ROOT);
-
+          if (!mounted) {
+            FS.mount(IDBFS, {}, IDB_ROOT);
+          }
           FS.syncfs(true, (err) => {
             if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
             __idbReady = true;
-
-            try {
-              if (exists(IDB_MIRROR)) {
-                mkdirp(LIVE_ROOT);
-                copyTree(IDB_MIRROR, LIVE_ROOT);
-              }
-            } catch(e){ console.warn('Restore LIVE_ROOT failed', e); }
-
-            try {
-              if (exists(IDB_MIRROR_DATA)) {
-                mkdirp(XDG_DATA_ROOT);
-                copyTree(IDB_MIRROR_DATA, XDG_DATA_ROOT);
-              }
-            } catch(e){ console.warn('Restore XDG_DATA_ROOT failed', e); }
-
+            if (exists(IDB_MIRROR)) {
+              mkdirp(LIVE_ROOT);
+              copyTree(IDB_MIRROR, LIVE_ROOT);
+            }
             resolve();
           });
         } catch (e) {
@@ -272,16 +253,11 @@
       });
     }
 
-    /* UPDATED: persist both mirrors on save */
     function persistToIDB() {
       return new Promise((resolve, reject) => {
         try {
           mkdirp(IDB_MIRROR);
-          try { copyTree(LIVE_ROOT, IDB_MIRROR); } catch(e){ console.warn('Mirror LIVE_ROOT failed', e); }
-
-          mkdirp(IDB_MIRROR_DATA);
-          try { copyTree(XDG_DATA_ROOT, IDB_MIRROR_DATA); } catch(e){ /* may not exist yet */ }
-
+          copyTree(LIVE_ROOT, IDB_MIRROR);
           FS.syncfs(false, (err) => err ? reject(err) : resolve());
         } catch (e) { reject(e); }
       });
@@ -327,75 +303,64 @@
       window.Module = M;
     })();
 
-    /* Mount IDB before the game starts */
+    /* Emscripten hooks */
     Module.preRun.push(function(){
       return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
     });
 
-    /* ---------- First-run mobile GUI defaults (writes gui_scale + zooms) ---------- */
-    (function(){
-      const CFG_INIT_KEY = 'openttd_cfg_initialized_v6';
-      const XDG_CFG_DIR  = '/home/web_user/.config/openttd';
-      const XDG_CFG_PATH = XDG_CFG_DIR + '/openttd.cfg';
-      const LEG_CFG_DIR  = '/home/web_user/.openttd';
-      const LEG_CFG_PATH = LEG_CFG_DIR + '/openttd.cfg';
-
-      function upsertGui(existing, scale){
-        let cfg = existing || '';
-        if (!/\n\[gui\]/i.test(cfg)) cfg += (cfg.endsWith('\n')?'':'\n') + '[gui]\n';
-        cfg = cfg.replace(/(^|\n)\s*(gui_scale|gui_zoom|font_zoom)\s*=.*(?=\n)/ig,'');
-        return cfg.replace(/\[gui\][^\[]*/i, m => {
-          const nl = m.endsWith('\n') ? '' : '\n';
-          return m + nl +
-            `gui_scale = ${scale}\n` +
-            `gui_zoom  = ${scale}\n` +
-            `font_zoom = ${scale}\n`;
-        });
-      }
-
-      async function apply(){
-        try{
+    /* ---------- First-run mobile GUI defaults (bigger UI on tablets/phones) ---------- */
+    (function () {
+      const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
+      async function ensureMobileGuiDefaults() {
+        try {
           if (localStorage.getItem(CFG_INIT_KEY) === '1') return;
-
           const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
-          if (!isTouch) return;
-
           const vw = Math.min(window.innerWidth, window.innerHeight);
-          const scale = (vw <= 820 ? 225 : (vw <= 1080 ? 200 : 175));
+          if (!isTouch) return; // desktop: skip
+
+          const guiZoom  = (vw <= 820 ? 200 : (vw <= 1080 ? 175 : 150));
+          const fontZoom = guiZoom;
 
           await ensureIDBMounted();
+          mkdirp(LIVE_ROOT);
 
-          mkdirp(XDG_CFG_DIR);
-          let xdg=''; try{ xdg=FS.readFile(XDG_CFG_PATH,{encoding:'utf8'});}catch(_){}
-          FS.writeFile(XDG_CFG_PATH, upsertGui(xdg, scale));
+          const cfgPath = LIVE_ROOT + '/openttd.cfg';
+          let cfgText = '';
+          let hasCfg = false;
+          try { cfgText = FS.readFile(cfgPath, { encoding:'utf8' }); hasCfg = true; } catch(_) {}
 
-          mkdirp(LEG_CFG_DIR);
-          let leg=''; try{ leg=FS.readFile(LEG_CFG_PATH,{encoding:'utf8'});}catch(_){}
-          FS.writeFile(LEG_CFG_PATH, upsertGui(leg, scale));
-
+          if (!hasCfg) {
+            cfgText = `[gui]\ngui_zoom = ${guiZoom}\nfont_zoom = ${fontZoom}\n`;
+          } else {
+            if (!/\n\[gui\]/i.test(cfgText)) cfgText += `\n[gui]\n`;
+            cfgText = cfgText.replace(/(^|\n)\s*gui_zoom\s*=.*(?=\n)/ig, '');
+            cfgText = cfgText.replace(/(^|\n)\s*font_zoom\s*=.*(?=\n)/ig, '');
+            cfgText = cfgText.replace(/\[gui\][^\[]*/i, m =>
+              m + (m.endsWith('\n') ? '' : '\n') + `gui_zoom = ${guiZoom}\nfont_zoom = ${fontZoom}\n`
+            );
+          }
+          FS.writeFile(cfgPath, cfgText);
           await persistToIDB();
-          localStorage.setItem(CFG_INIT_KEY,'1');
-          console.log('[OpenTTD] Set gui_scale/gui_zoom/font_zoom to', scale);
-        }catch(e){ console.warn('GUI defaults failed', e); }
-      }
 
-      Module.preRun.push(()=>apply());
-    })();
-
-    /* ---------- Force the engine to use our XDG config ---------- */
-    (function(){
-      const XDG_CFG_PATH = '/home/web_user/.config/openttd/openttd.cfg';
-      if (!Array.isArray(Module.arguments)) Module.arguments = [];
-      if (!Module.arguments.includes('-c')) {
-        Module.arguments.push('-c', XDG_CFG_PATH);
+          localStorage.setItem(CFG_INIT_KEY, '1');
+          console.log('[OpenTTD] Applied first-run mobile GUI defaults:', { guiZoom, fontZoom });
+        } catch (e) {
+          console.warn('Failed to apply mobile GUI defaults', e);
+        }
       }
-      console.log('[OpenTTD] Using cfg via -c', XDG_CFG_PATH);
+      Module.preRun.push(function(){ return ensureMobileGuiDefaults(); });
     })();
 
     Module.print   = (...a)=>console.log(a.join(' '));
     Module.printErr= (...a)=>console.error(a.join(' '));
 
-    Module.canvas = (()=>{var e=document.getElementById("canvas");e.addEventListener("webglcontextlost",ev=>{alert("WebGL context lost. Reload the page."); ev.preventDefault();},false);return e;})();
+    Module.canvas = (()=>{
+      var e=document.getElementById("canvas");
+      e.addEventListener("webglcontextlost",ev=>{
+        alert("WebGL context lost. Reload the page."); ev.preventDefault();
+      },false);
+      return e;
+    })();
 
     Module.setStatus = function(e){
       const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
@@ -445,56 +410,6 @@
     Module.postRun.push(showGameUI);
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
-
-    /* ---------- Sticky backing-resolution upscaler (no CSS transforms) ---------- */
-    (function () {
-      function isTouch(){ return matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window); }
-      const TOUCH_RENDER_SCALE = 2.2;
-
-      function desiredBackingSize(vw, vh, dpr){
-        const s = isTouch() ? TOUCH_RENDER_SCALE : 1.0;
-        return {
-          w: Math.max(1, Math.floor(vw * dpr / s)),
-          h: Math.max(1, Math.floor(vh * dpr / s)),
-        };
-      }
-
-      function applyCanvasScale() {
-        const canvas = document.getElementById('canvas');
-        if (!canvas) return;
-
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const dpr = Math.max(1, window.devicePixelRatio || 1);
-        const { w, h } = desiredBackingSize(vw, vh, dpr);
-
-        if (canvas.width !== w || canvas.height !== h) {
-          canvas.width  = w;
-          canvas.height = h;
-          if (typeof Module !== 'undefined' && Module.setCanvasSize) {
-            try { Module.setCanvasSize(w, h, false); } catch (_) {}
-          }
-        }
-
-        canvas.style.width  = vw + 'px';
-        canvas.style.height = vh + 'px';
-        canvas.tabIndex = 1;
-      }
-
-      function watchCanvas(){
-        const c = document.getElementById('canvas');
-        if (!c || window.__uiScaleWatcher) return;
-        window.__uiScaleWatcher = new ResizeObserver(()=>applyCanvasScale());
-        window.__uiScaleWatcher.observe(c);
-      }
-
-      window.addEventListener('resize', applyCanvasScale);
-      window.addEventListener('orientationchange', applyCanvasScale);
-      document.addEventListener('DOMContentLoaded', ()=>{ applyCanvasScale(); watchCanvas(); });
-      window.addEventListener('load', ()=> setTimeout(()=>{ applyCanvasScale(); watchCanvas(); }, 0));
-
-      let n=0; const tick=setInterval(()=>{ applyCanvasScale(); if(++n>20) clearInterval(tick); }, 250);
-    })();
 
     /* ---------- Mobile-friendly export helpers ---------- */
     function openBlobURLInNewContext(url){
@@ -626,77 +541,116 @@
   <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
-  <!-- Pinch zoom handler -->
+  <!-- 🔧 Auto-scale UI for mobile / high-DPI displays -->
   <script>
-  (function(){
-    const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+  (function () {
+    function updateCanvasScale() {
+      const canvas = document.getElementById('canvas');
+      if (!canvas) return;
 
-    function attach(){
-      const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
-      if (!canvas) return false;
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
 
-      canvas.style.touchAction = 'none';
-      canvas.style.cursor = 'none';
+      // Smaller logical width => larger UI on phones
+      const targetLogicalWidth = (vw < 768) ? 960 : 1280;
 
-      let pA = null, pB = null;
-      let lastDist = 0;
+      const backingW = Math.floor(vw * dpr);
+      const backingH = Math.floor(vh * dpr);
 
-      function pinchDist(t1, t2){
-        return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      canvas.width  = backingW;
+      canvas.height = backingH;
+      canvas.style.width  = vw + 'px';
+      canvas.style.height = vh + 'px';
+
+      if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+        Module.setCanvasSize(backingW, backingH, false);
       }
 
-      canvas.addEventListener('touchstart', e => {
-        if (e.touches.length === 2){
-          e.preventDefault();
-          pA = e.touches[0];
-          pB = e.touches[1];
-          lastDist = pinchDist(pA, pB);
-        }
-      }, {passive:false});
-
-      canvas.addEventListener('touchmove', e => {
-        if (e.touches.length !== 2) return;
-        e.preventDefault();
-
-        const t1 = e.touches[0], t2 = e.touches[1];
-        const dist = pinchDist(t1, t2);
-        const scale = dist / lastDist;
-
-        if (Math.abs(scale - 1) > 0.01) {
-          const cx = (t1.clientX + t2.clientX) / 2;
-          const cy = (t1.clientY + t2.clientY) / 2;
-
-          const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
-          canvas.dispatchEvent(new WheelEvent('wheel', {
-            deltaY: -delta,
-            clientX: cx,
-            clientY: cy,
-            bubbles: true
-          }));
-          lastDist = dist;
-        }
-      }, {passive:false});
-
-      canvas.addEventListener('touchend', e => {
-        if (e.touches.length < 2) pA = pB = null;
-      }, {passive:false});
-
-      canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
-
-      return true;
+      // Enable soft keyboard focus
+      canvas.tabIndex = 1;
+      canvas.addEventListener('click', () => canvas.focus(), { once: true });
     }
 
-    if (!attach()){
-      const prev = (window.Module && Module.onRuntimeInitialized) || null;
-      window.Module = window.Module || {};
-      Module.onRuntimeInitialized = function(){
-        if (prev) prev();
-        attach();
-      };
-      window.addEventListener('load', () => setTimeout(attach, 0));
-    }
+    window.addEventListener('resize', updateCanvasScale);
+    window.addEventListener('orientationchange', updateCanvasScale);
+    document.addEventListener('DOMContentLoaded', updateCanvasScale);
+    updateCanvasScale();
   })();
   </script>
+
+  <!-- Existing pinch-zoom handler -->
+  <script>
+  (function(){
+  const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+
+  function attach(){
+    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+    if (!canvas) return false;
+
+    canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'none';
+
+    let pA = null, pB = null;
+    let lastDist = 0;
+
+    function pinchDist(t1, t2){
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    }
+
+    canvas.addEventListener('touchstart', e => {
+      if (e.touches.length === 2){
+        e.preventDefault();
+        pA = e.touches[0];
+        pB = e.touches[1];
+        lastDist = pinchDist(pA, pB);
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchmove', e => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault();
+
+      const t1 = e.touches[0], t2 = e.touches[1];
+      theDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const dist = theDist;
+      const scale = dist / lastDist;
+
+      if (Math.abs(scale - 1) > 0.01) {
+        const cx = (t1.clientX + t2.clientX) / 2;
+        const cy = (t1.clientY + t2.clientY) / 2;
+
+        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -delta,
+          clientX: cx,
+          clientY: cy,
+          bubbles: true
+        }));
+        lastDist = dist;
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchend', e => {
+      if (e.touches.length < 2) pA = pB = null;
+    }, {passive:false});
+
+    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+
+    return true;
+  }
+
+  if (!attach()){
+    const prev = (window.Module && Module.onRuntimeInitialized) || null;
+    window.Module = window.Module || {};
+    Module.onRuntimeInitialized = function(){
+      if (prev) prev();
+      attach();
+    };
+    window.addEventListener('load', () => setTimeout(attach, 0));
+    }
+  })();
+</script>
 
 </body>
 </html>
