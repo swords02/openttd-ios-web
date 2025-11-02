@@ -308,6 +308,49 @@
       return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
     });
 
+    /* ---------- First-run mobile GUI defaults (bigger UI on tablets/phones) ---------- */
+    (function () {
+      const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
+      async function ensureMobileGuiDefaults() {
+        try {
+          if (localStorage.getItem(CFG_INIT_KEY) === '1') return;
+          const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+          const vw = Math.min(window.innerWidth, window.innerHeight);
+          if (!isTouch) return; // desktop: skip
+
+          const guiZoom  = (vw <= 820 ? 200 : (vw <= 1080 ? 175 : 150));
+          const fontZoom = guiZoom;
+
+          await ensureIDBMounted();
+          mkdirp(LIVE_ROOT);
+
+          const cfgPath = LIVE_ROOT + '/openttd.cfg';
+          let cfgText = '';
+          let hasCfg = false;
+          try { cfgText = FS.readFile(cfgPath, { encoding:'utf8' }); hasCfg = true; } catch(_) {}
+
+          if (!hasCfg) {
+            cfgText = `[gui]\ngui_zoom = ${guiZoom}\nfont_zoom = ${fontZoom}\n`;
+          } else {
+            if (!/\n\[gui\]/i.test(cfgText)) cfgText += `\n[gui]\n`;
+            cfgText = cfgText.replace(/(^|\n)\s*gui_zoom\s*=.*(?=\n)/ig, '');
+            cfgText = cfgText.replace(/(^|\n)\s*font_zoom\s*=.*(?=\n)/ig, '');
+            cfgText = cfgText.replace(/\[gui\][^\[]*/i, m =>
+              m + (m.endsWith('\n') ? '' : '\n') + `gui_zoom = ${guiZoom}\nfont_zoom = ${fontZoom}\n`
+            );
+          }
+          FS.writeFile(cfgPath, cfgText);
+          await persistToIDB();
+
+          localStorage.setItem(CFG_INIT_KEY, '1');
+          console.log('[OpenTTD] Applied first-run mobile GUI defaults:', { guiZoom, fontZoom });
+        } catch (e) {
+          console.warn('Failed to apply mobile GUI defaults', e);
+        }
+      }
+      Module.preRun.push(function(){ return ensureMobileGuiDefaults(); });
+    })();
+
     Module.print   = (...a)=>console.log(a.join(' '));
     Module.printErr= (...a)=>console.error(a.join(' '));
 
@@ -509,9 +552,8 @@
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // Smaller logical width = bigger UI
+      // Smaller logical width => larger UI on phones
       const targetLogicalWidth = (vw < 768) ? 960 : 1280;
-      const scale = Math.min(vw / targetLogicalWidth, 1.0);
 
       const backingW = Math.floor(vw * dpr);
       const backingH = Math.floor(vh * dpr);
@@ -525,7 +567,7 @@
         Module.setCanvasSize(backingW, backingH, false);
       }
 
-      // Ensure focus for soft keyboard
+      // Enable soft keyboard focus
       canvas.tabIndex = 1;
       canvas.addEventListener('click', () => canvas.focus(), { once: true });
     }
@@ -540,51 +582,75 @@
   <!-- Existing pinch-zoom handler -->
   <script>
   (function(){
-    const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
-    function attach(){
-      const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
-      if (!canvas) return false;
-      canvas.style.touchAction = 'none';
-      canvas.style.cursor = 'none';
-      let pA = null, pB = null, lastDist = 0;
-      function pinchDist(t1, t2){ return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY); }
-      canvas.addEventListener('touchstart', e => {
-        if (e.touches.length === 2){ e.preventDefault(); pA = e.touches[0]; pB = e.touches[1]; lastDist = pinchDist(pA, pB); }
-      }, {passive:false});
-      canvas.addEventListener('touchmove', e => {
-        if (e.touches.length !== 2) return;
-        e.preventDefault();
-        const t1 = e.touches[0], t2 = e.touches[1];
-        const dist = pinchDist(t1, t2);
-        const scale = dist / lastDist;
-        if (Math.abs(scale - 1) > 0.01) {
-          const cx = (t1.clientX + t2.clientX) / 2;
-          const cy = (t1.clientY + t2.clientY) / 2;
-          const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
-          canvas.dispatchEvent(new WheelEvent('wheel', {
-            deltaY: -delta,
-            clientX: cx,
-            clientY: cy,
-            bubbles: true
-          }));
-          lastDist = dist;
-        }
-      }, {passive:false});
-      canvas.addEventListener('touchend', e => { if (e.touches.length < 2) pA = pB = null; }, {passive:false});
-      canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
-      return true;
+  const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+
+  function attach(){
+    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+    if (!canvas) return false;
+
+    canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'none';
+
+    let pA = null, pB = null;
+    let lastDist = 0;
+
+    function pinchDist(t1, t2){
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     }
-    if (!attach()){
-      const prev = (window.Module && Module.onRuntimeInitialized) || null;
-      window.Module = window.Module || {};
-      Module.onRuntimeInitialized = function(){
-        if (prev) prev();
-        attach();
-      };
-      window.addEventListener('load', () => setTimeout(attach, 0));
+
+    canvas.addEventListener('touchstart', e => {
+      if (e.touches.length === 2){
+        e.preventDefault();
+        pA = e.touches[0];
+        pB = e.touches[1];
+        lastDist = pinchDist(pA, pB);
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchmove', e => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault();
+
+      const t1 = e.touches[0], t2 = e.touches[1];
+      theDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      const dist = theDist;
+      const scale = dist / lastDist;
+
+      if (Math.abs(scale - 1) > 0.01) {
+        const cx = (t1.clientX + t2.clientX) / 2;
+        const cy = (t1.clientY + t2.clientY) / 2;
+
+        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -delta,
+          clientX: cx,
+          clientY: cy,
+          bubbles: true
+        }));
+        lastDist = dist;
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchend', e => {
+      if (e.touches.length < 2) pA = pB = null;
+    }, {passive:false});
+
+    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+
+    return true;
+  }
+
+  if (!attach()){
+    const prev = (window.Module && Module.onRuntimeInitialized) || null;
+    window.Module = window.Module || {};
+    Module.onRuntimeInitialized = function(){
+      if (prev) prev();
+      attach();
+    };
+    window.addEventListener('load', () => setTimeout(attach, 0));
     }
   })();
-  </script>
+</script>
 
 </body>
 </html>
