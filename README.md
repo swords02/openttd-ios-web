@@ -1,4 +1,5 @@
 Download the Chrome extension: https://chromewebstore.google.com/detail/dfpfjgfeojaoakbdhikfpdbcnkknnpag?utm_source=item-share-cb
+
 How to play: https://wiki.openttd.org/en/Manual/Tutorial/
 
 Disclaimer: This is an unofficial fan-made port of the open-source project OpenTTD.
