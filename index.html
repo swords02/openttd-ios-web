@@ -197,22 +197,6 @@
     font-size: 14px;
   }
 
-  .volume-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    background: #e4e4e4;
-    border: 1px solid #808080;
-    padding: 4px 6px;
-    margin-top: 6px;
-    font-size: 11px;
-  }
-
-  .volume-row input[type="range"] {
-    flex: 1;
-    accent-color: #008000;
-  }
-
   .track-bar-labels {
     display: flex;
     justify-content: space-between;
@@ -352,10 +336,7 @@
       font-size: 12px;
       padding: 3px 10px;
     }
-
-    .volume-row {
-      display: none; /* 🔥 HIDE VOLUME SLIDER ON MOBILE */
-    }
+        
   }
 </style>
 </head>
@@ -416,7 +397,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const progressBarFill = document.getElementById("progressBarFill");
   const currentTimeLabel = document.getElementById("currentTimeLabel");
   const durationLabel = document.getElementById("durationLabel");
-  const volumeSlider = document.getElementById("volumeSlider");
 
   const btnClose = document.getElementById("btnClose");
   const header = document.getElementById("ttdWindowHeader");
@@ -520,11 +500,6 @@ document.addEventListener("DOMContentLoaded", () => {
   btnRepeat.onclick = () => {
     isRepeat = !isRepeat;
     btnRepeat.classList.toggle("toggle-on", isRepeat);
-  };
-
-  /* === VOLUME === (still used on desktop; slider is hidden on mobile via CSS) === */
-  volumeSlider.oninput = () => {
-    audio.volume = parseFloat(volumeSlider.value);
   };
 
   /* === SEEK === */
@@ -1210,11 +1185,6 @@ document.addEventListener("DOMContentLoaded", () => {
           <button class="transport-btn" id="btnPrev">&#9664;</button>
           <button class="transport-btn" id="btnNext">&#9654;</button>
           <button class="transport-btn" id="btnPlayPause">&#9658;</button>
-        </div>
-
-        <div class="volume-row">
-          <span class="vol-label">Music Volume</span>
-          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.6">
         </div>
 
         <div class="track-bar-labels">
