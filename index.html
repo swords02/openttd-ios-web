@@ -91,219 +91,279 @@
   }
   .error{color:#ff6b6b}
 
-  /* Hide system cursor globally; show pointer over toolbar & toggle */
+  /* Hide system cursor globally; show pointer over toolbar & Jukebox/etc */
   html, body, canvas, #canvas, * { cursor: none !important; }
-  #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle * { cursor: pointer !important; }
+  #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle *,
+  .jazz-jukebox-open-btn, .jazz-jukebox-open-btn *,
+  .jazz-jukebox-window, .jazz-jukebox-window * {
+    cursor: pointer !important;
+  }
 
   @media (max-width: 480px){
     #toolbar{ width: 200px !important; }
     #toolbar button{ font-size:15px; padding:12px 14px; }
   }
   
-  /* === Jazz Jukebox – Button === */
-.jazz-jukebox-open-btn {
-  position: fixed;
-  left: 12px;
-  bottom: 12px;
-  padding: 3px 10px;
-  font-size: 11px;
-  border: 1px solid #808080;
-  background: #c0c0c0;
-  box-shadow: inset 1px 1px #fff, inset -1px -1px #404040;
-  cursor: pointer;
-  z-index: 9999;
-}
+  /* === Jazz Jukebox – Open Button (desktop + mobile base) === */
+  .jazz-jukebox-open-btn {
+    position: fixed;
+    left: 12px;
+    bottom: 12px;
+    padding: 3px 10px;
+    font-size: 11px;
+    border: 1px solid #808080;
+    background: #c0c0c0;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #404040;
+    cursor: pointer;
+    z-index: 9999;
+  }
 
-/* === Jazz Jukebox – Window === */
-.jazz-jukebox-window {
-  width: 520px;
-  background: #c0c0c0;
-  border: 1px solid #000;
-  box-shadow: 0 0 0 1px #404040;
-  display: flex;
-  flex-direction: column;
-  position: absolute;
-  top: 80px;
-  left: 80px;
-  z-index: 9998;
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-}
+  /* === Jazz Jukebox – Window (desktop base) === */
+  .jazz-jukebox-window {
+    width: 520px;
+    max-width: 90vw;
+    background: #c0c0c0;
+    border: 1px solid #000;
+    box-shadow: 0 0 0 1px #404040;
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 80px;
+    left: 80px;
+    z-index: 9998;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
 
-.jazz-jukebox-header {
-  background: #a0a0a0;
-  border-bottom: 1px solid #404040;
-  padding: 2px 6px;
-  display: flex;
-  justify-content: space-between;
-  user-select: none;
-  cursor: move;
-}
+  .jazz-jukebox-header {
+    background: #a0a0a0;
+    border-bottom: 1px solid #404040;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    cursor: move;
+  }
 
-.jazz-jukebox-header .title {
-  margin: 0 auto;
-  color: #f0f0f0;
-  font-weight: bold;
-  font-size: 12px;
-  text-shadow: 1px 1px #404040;
-}
+  .jazz-jukebox-header .title {
+    margin: 0 auto;
+    color: #f0f0f0;
+    font-weight: bold;
+    font-size: 13px;
+    text-shadow: 1px 1px #404040;
+  }
 
-.jazz-jukebox-header .btn-close {
-  width: 14px;
-  height: 14px;
-  border: 1px solid #404040;
-  background: #c0c0c0;
-  box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
-  text-align: center;
-  font-size: 10px;
-  cursor: pointer;
-}
+  .jazz-jukebox-header .btn-close {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    line-height: 16px;
+  }
 
-.jazz-jukebox-body {
-  padding: 4px;
-  background: #b0b0b0;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 4px;
-}
+  .jazz-jukebox-body {
+    padding: 6px;
+    background: #b0b0b0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
 
-/* === LEFT SIDE === */
-.current-track-box {
-  border: 1px solid #404040;
-  background: #c0c0c0;
-  padding: 4px;
-  box-shadow: inset 1px 1px #f8f8f8, inset -1px -1px #808080;
-}
+  /* === LEFT SIDE === */
+  .current-track-box {
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    padding: 6px;
+    box-shadow: inset 1px 1px #f8f8f8, inset -1px -1px #808080;
+  }
 
-.button-row-top {
-  display: flex;
-  gap: 4px;
-}
+  .button-row-top {
+    display: flex;
+    gap: 6px;
+  }
 
-.transport-btn {
-  width: 20px;
-  height: 20px;
-  background: #c0c0c0;
-  border: 1px solid #404040;
-  box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
-  cursor: pointer;
-}
+  .transport-btn {
+    width: 26px;
+    height: 26px;
+    background: #c0c0c0;
+    border: 1px solid #404040;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+    cursor: pointer;
+    font-size: 14px;
+  }
 
-.volume-row {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background: #e4e4e4;
-  border: 1px solid #808080;
-  padding: 2px 4px;
-  margin-top: 4px;
-}
+  .volume-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #e4e4e4;
+    border: 1px solid #808080;
+    padding: 4px 6px;
+    margin-top: 6px;
+    font-size: 11px;
+  }
 
-.volume-row input[type="range"] {
-  flex: 1;
-  accent-color: #008000;
-}
+  .volume-row input[type="range"] {
+    flex: 1;
+    accent-color: #008000;
+  }
 
-.track-bar-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  margin-top: 4px;
-}
+  .track-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-top: 6px;
+  }
 
-.track-bar {
-  height: 14px;
-  background: #000;
-  border: 1px solid #404040;
-  position: relative;
-  cursor: pointer;
-  margin-top: 2px;
-}
+  .track-bar {
+    height: 16px;
+    background: #000;
+    border: 1px solid #404040;
+    position: relative;
+    cursor: pointer;
+    margin-top: 2px;
+  }
 
-.track-bar-fill {
-  height: 10px;
-  background: #00ff00;
-  margin: 2px;
-  width: 0%;
-}
+  .track-bar-fill {
+    height: 12px;
+    background: #00ff00;
+    margin: 2px;
+    width: 0%;
+  }
 
-.track-bar-title {
-  position: absolute;
-  top: 0;
-  color: #b8ffb8;
-  font-size: 10px;
-  width: 100%;
-  text-align: center;
-  pointer-events: none;
-}
+  .track-bar-title {
+    position: absolute;
+    top: 0;
+    color: #b8ffb8;
+    font-size: 10px;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
+  }
 
-.time-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  margin-top: 2px;
-}
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-top: 4px;
+  }
 
-.shuffle-row {
-  display: flex;
-  gap: 4px;
-  margin-top: 4px;
-}
+  .shuffle-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
 
-.ttd-btn {
-  padding: 1px 6px;
-  border: 1px solid #404040;
-  background: #c0c0c0;
-  box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
-  cursor: pointer;
-  font-size: 10px;
-}
+  .ttd-btn {
+    padding: 2px 8px;
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+    cursor: pointer;
+    font-size: 11px;
+  }
 
-.ttd-btn.toggle-on {
-  background: #808080;
-  color: #fff;
-}
+  .ttd-btn.toggle-on {
+    background: #808080;
+    color: #fff;
+  }
 
-/* === RIGHT SIDE === */
-.playlist-box {
-  border: 1px solid #404040;
-  background: #c0c0c0;
-  padding: 4px;
-}
+  /* === RIGHT SIDE === */
+  .playlist-box {
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    padding: 6px;
+  }
 
-.playlist-header {
-  font-size: 11px;
-  margin-bottom: 2px;
-}
+  .playlist-header {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
 
-.playlist-list {
-  height: 130px;
-  border: 1px solid #404040;
-  overflow-y: auto;
-  background: #b0b0b0;
-}
+  .playlist-list {
+    height: 150px;
+    border: 1px solid #404040;
+    overflow-y: auto;
+    background: #b0b0b0;
+  }
 
-.playlist-item {
-  padding: 1px 4px;
-  font-size: 10px;
-  line-height: 16px;
-  cursor: pointer;
-}
+  .playlist-item {
+    padding: 2px 4px;
+    font-size: 11px;
+    line-height: 18px;
+    cursor: pointer;
+  }
 
-.playlist-item.active {
-  background: #000;
-  color: #00ff00;
-}
+  .playlist-item.active {
+    background: #000;
+    color: #00ff00;
+  }
 
-.playlist-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 9px;
-  margin-top: 2px;
-}
+  .playlist-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    margin-top: 4px;
+  }
 
+  /* === MOBILE ADAPTATION (bottom sheet style) === */
+  @media (max-width: 768px) {
+    .jazz-jukebox-open-btn {
+      left: 50%;
+      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+      transform: translateX(-50%);
+      padding: 8px 18px;
+      font-size: 13px;
+    }
+
+    .jazz-jukebox-window {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: auto;
+      width: 100%;
+      max-width: 100%;
+      border-radius: 10px 10px 0 0;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+    }
+
+    .jazz-jukebox-body {
+      grid-template-columns: 1fr; /* stack controls over playlist */
+      gap: 8px;
+    }
+
+    .playlist-list {
+      height: 120px;
+    }
+
+    .jazz-jukebox-header {
+      cursor: default; /* drag disabled on mobile */
+    }
+
+    .transport-btn {
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+    }
+
+    .ttd-btn {
+      font-size: 12px;
+      padding: 3px 10px;
+    }
+
+    .volume-row {
+      font-size: 12px;
+    }
+  }
 </style>
 </head>
 
+<!-- Jazz Jukebox logic -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const playlist = [
@@ -495,18 +555,23 @@ document.addEventListener("DOMContentLoaded", () => {
     return m + ":" + sec;
   }
 
-  /* === DRAGGABLE WINDOW === */
+  /* === DRAGGABLE WINDOW (desktop only) === */
   const header = document.getElementById("ttdWindowHeader");
   let drag = false, dx = 0, dy = 0;
 
+  function isMobile() {
+    return window.matchMedia("(max-width: 768px)").matches;
+  }
+
   header.onmousedown = (e) => {
+    if (isMobile()) return; // don't drag on mobile; bottom sheet is fixed
     drag = true;
     dx = e.clientX - ttdWindow.offsetLeft;
     dy = e.clientY - ttdWindow.offsetTop;
   };
   document.onmouseup = () => { drag = false; };
   document.onmousemove = (e) => {
-    if (!drag) return;
+    if (!drag || isMobile()) return;
     ttdWindow.style.left = (e.clientX - dx) + "px";
     ttdWindow.style.top = (e.clientY - dy) + "px";
   };
@@ -735,7 +800,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
     });
 
-    /* ---------- First-run mobile GUI defaults (bigger UI on tablets/phones) ---------- */
+    /* ---------- First-run mobile GUI defaults ---------- */
     (function () {
       const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
       async function ensureMobileGuiDefaults() {
@@ -979,9 +1044,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
 
-      // Smaller logical width => larger UI on phones
-      const targetLogicalWidth = (vw < 768) ? 960 : 1280;
-
       const backingW = Math.floor(vw * dpr);
       const backingH = Math.floor(vh * dpr);
 
@@ -994,7 +1056,6 @@ document.addEventListener("DOMContentLoaded", () => {
         Module.setCanvasSize(backingW, backingH, false);
       }
 
-      // Enable soft keyboard focus
       canvas.tabIndex = 1;
       canvas.addEventListener('click', () => canvas.focus(), { once: true });
     }
@@ -1039,8 +1100,7 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
 
       const t1 = e.touches[0], t2 = e.touches[1];
-      theDist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      const dist = theDist;
+      const dist = pinchDist(t1, t2);
       const scale = dist / lastDist;
 
       if (Math.abs(scale - 1) > 0.01) {
@@ -1077,69 +1137,69 @@ document.addEventListener("DOMContentLoaded", () => {
     window.addEventListener('load', () => setTimeout(attach, 0));
     }
   })();
-</script>
+  </script>
 
-<!-- === Jazz Jukebox Music Player === -->
-<button class="jazz-jukebox-open-btn" id="openMusicBtn">Jazz Jukebox</button>
+  <!-- === Jazz Jukebox Music Player === -->
+  <button class="jazz-jukebox-open-btn" id="openMusicBtn">Jazz Jukebox</button>
 
-<div class="jazz-jukebox-window" id="ttdWindow" style="display:none;">
-  <div class="jazz-jukebox-header" id="ttdWindowHeader">
-    <span></span>
-    <div class="title">Jazz Jukebox</div>
-    <div class="btn-close" id="btnClose">X</div>
-  </div>
-
-  <div class="jazz-jukebox-body">
-    <!-- LEFT SIDE -->
-    <div class="current-track-box">
-
-      <div class="button-row-top">
-        <button class="transport-btn" id="btnPrev">&#9664;</button>
-        <button class="transport-btn" id="btnNext">&#9654;</button>
-        <button class="transport-btn" id="btnPlayPause">&#9658;</button>
-      </div>
-
-      <div class="volume-row">
-        <span class="vol-label">Music Volume</span>
-        <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.6">
-      </div>
-
-      <div class="track-bar-labels">
-        <span>Track</span>
-        <span>Programme</span>
-      </div>
-
-      <div class="track-bar" id="progressBarWrap">
-        <div class="track-bar-fill" id="progressBarFill"></div>
-        <div class="track-bar-title" id="currentTrackTitle">---</div>
-      </div>
-
-      <div class="time-row">
-        <span id="currentTimeLabel">0:00</span>
-        <span id="durationLabel">0:00</span>
-      </div>
-
-      <div class="shuffle-row">
-        <button class="ttd-btn" id="btnShuffle">Shuffle</button>
-        <button class="ttd-btn" id="btnRepeat">Rep</button>
-      </div>
-
+  <div class="jazz-jukebox-window" id="ttdWindow" style="display:none;">
+    <div class="jazz-jukebox-header" id="ttdWindowHeader">
+      <span></span>
+      <div class="title">Jazz Jukebox</div>
+      <div class="btn-close" id="btnClose">X</div>
     </div>
 
-    <!-- RIGHT SIDE -->
-    <div class="playlist-box">
-      <div class="playlist-header">Track List</div>
-      <div class="playlist-list" id="playlistList"></div>
+    <div class="jazz-jukebox-body">
+      <!-- LEFT SIDE -->
+      <div class="current-track-box">
 
-      <div class="playlist-footer">
-        <span id="playlistCountLabel">0 tracks</span>
-        <span id="playlistModeLabel"></span>
+        <div class="button-row-top">
+          <button class="transport-btn" id="btnPrev">&#9664;</button>
+          <button class="transport-btn" id="btnNext">&#9654;</button>
+          <button class="transport-btn" id="btnPlayPause">&#9658;</button>
+        </div>
+
+        <div class="volume-row">
+          <span class="vol-label">Music Volume</span>
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.6">
+        </div>
+
+        <div class="track-bar-labels">
+          <span>Track</span>
+          <span>Programme</span>
+        </div>
+
+        <div class="track-bar" id="progressBarWrap">
+          <div class="track-bar-fill" id="progressBarFill"></div>
+          <div class="track-bar-title" id="currentTrackTitle">---</div>
+        </div>
+
+        <div class="time-row">
+          <span id="currentTimeLabel">0:00</span>
+          <span id="durationLabel">0:00</span>
+        </div>
+
+        <div class="shuffle-row">
+          <button class="ttd-btn" id="btnShuffle">Shuffle</button>
+          <button class="ttd-btn" id="btnRepeat">Rep</button>
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDE -->
+      <div class="playlist-box">
+        <div class="playlist-header">Track List</div>
+        <div class="playlist-list" id="playlistList"></div>
+
+        <div class="playlist-footer">
+          <span id="playlistCountLabel">0 tracks</span>
+          <span id="playlistModeLabel"></span>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<audio id="audioElement"></audio>
+  <audio id="audioElement"></audio>
 
 </body>
 </html>
