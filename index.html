@@ -354,7 +354,7 @@
     }
 
     .volume-row {
-      font-size: 12px;
+      display: none; /* 🔥 HIDE VOLUME SLIDER ON MOBILE */
     }
   }
 </style>
@@ -522,7 +522,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnRepeat.classList.toggle("toggle-on", isRepeat);
   };
 
-  /* === VOLUME === */
+  /* === VOLUME === (still used on desktop; slider is hidden on mobile via CSS) === */
   volumeSlider.oninput = () => {
     audio.volume = parseFloat(volumeSlider.value);
   };
