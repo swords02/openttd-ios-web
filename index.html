@@ -417,6 +417,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const durationLabel = document.getElementById("durationLabel");
   const volumeSlider = document.getElementById("volumeSlider");
 
+  const btnClose = document.getElementById("btnClose");
+
   let currentIndex = 0;
   let isShuffle = false;
   let isRepeat = false;
@@ -569,7 +571,7 @@ document.addEventListener("DOMContentLoaded", () => {
     isDragging = true;
     dragStartX = clientX;
     dragStartY = clientY;
-    // Ensure we have numeric left/top
+
     const computed = window.getComputedStyle(ttdWindow);
     startLeft = parseInt(computed.left, 10) || ttdWindow.offsetLeft || 0;
     startTop  = parseInt(computed.top, 10)  || ttdWindow.offsetTop  || 0;
@@ -598,15 +600,19 @@ document.addEventListener("DOMContentLoaded", () => {
     isDragging = false;
   }
 
+  // Mouse drag
   header.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
+    if (e.target.closest("#btnClose")) return; // don't start drag when clicking X
     e.preventDefault();
     startDrag(e.clientX, e.clientY);
   });
 
+  // Touch drag
   header.addEventListener("touchstart", (e) => {
     const t = e.touches[0];
     if (!t) return;
+    if (e.target.closest("#btnClose")) return; // allow tap on X
     e.preventDefault();
     startDrag(t.clientX, t.clientY);
   }, { passive: false });
@@ -616,9 +622,10 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   document.addEventListener("touchmove", (e) => {
+    if (!isDragging) return;          // only intercept when dragging
     const t = e.touches[0];
     if (!t) return;
-    e.preventDefault();
+    e.preventDefault();               // prevent scroll only while dragging
     performDrag(t.clientX, t.clientY);
   }, { passive: false });
 
@@ -632,9 +639,15 @@ document.addEventListener("DOMContentLoaded", () => {
     audio.play().catch(()=>{});
   };
 
-  document.getElementById("btnClose").onclick = () => {
+  btnClose.onclick = () => {
     ttdWindow.style.display = "none";
   };
+
+  // Extra safety for touch: close on touchend, even if click is suppressed
+  btnClose.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    ttdWindow.style.display = "none";
+  });
 
   /* === INIT === */
   buildPlaylist();
