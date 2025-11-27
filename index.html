@@ -104,7 +104,7 @@
     #toolbar button{ font-size:15px; padding:12px 14px; }
   }
   
-  /* === Jazz Jukebox – Open Button (desktop + mobile base) === */
+  /* === Jazz Jukebox – Open Button === */
   .jazz-jukebox-open-btn {
     position: fixed;
     left: 12px;
@@ -143,6 +143,7 @@
     align-items: center;
     user-select: none;
     cursor: move;
+    touch-action: none; /* important for pointer-based drag on mobile */
   }
 
   .jazz-jukebox-header .title {
@@ -418,6 +419,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const volumeSlider = document.getElementById("volumeSlider");
 
   const btnClose = document.getElementById("btnClose");
+  const header = document.getElementById("ttdWindowHeader");
 
   let currentIndex = 0;
   let isShuffle = false;
@@ -460,6 +462,7 @@ document.addEventListener("DOMContentLoaded", () => {
       playlistList.appendChild(item);
     });
     playlistCountLabel.textContent = playlist.length + " tracks";
+    playlistModeLabel.textContent = "";
   }
 
   /* === NEXT / PREV === */
@@ -521,7 +524,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* === VOLUME === */
   volumeSlider.oninput = () => {
-    audio.volume = volumeSlider.value;
+    audio.volume = parseFloat(volumeSlider.value);
   };
 
   /* === SEEK === */
@@ -553,18 +556,14 @@ document.addEventListener("DOMContentLoaded", () => {
     return m + ":" + sec;
   }
 
-  /* === DRAGGABLE WINDOW (mouse + touch) === */
-  const header = document.getElementById("ttdWindowHeader");
+  /* === DRAGGABLE WINDOW (pointer events for mouse + touch) === */
   let isDragging = false;
   let dragStartX = 0, dragStartY = 0;
   let startLeft = 0, startTop = 0;
 
   function getWindowRect() {
     const rect = ttdWindow.getBoundingClientRect();
-    return {
-      width: rect.width,
-      height: rect.height
-    };
+    return { width: rect.width, height: rect.height };
   }
 
   function startDrag(clientX, clientY) {
@@ -600,38 +599,30 @@ document.addEventListener("DOMContentLoaded", () => {
     isDragging = false;
   }
 
-  // Mouse drag
-  header.addEventListener("mousedown", (e) => {
-    if (e.button !== 0) return;
-    if (e.target.closest("#btnClose")) return; // don't start drag when clicking X
-    e.preventDefault();
+  header.addEventListener("pointerdown", (e) => {
+    // don't drag when pressing the X button
+    if (e.target.closest("#btnClose")) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
     startDrag(e.clientX, e.clientY);
+    header.setPointerCapture(e.pointerId);
   });
 
-  // Touch drag
-  header.addEventListener("touchstart", (e) => {
-    const t = e.touches[0];
-    if (!t) return;
-    if (e.target.closest("#btnClose")) return; // allow tap on X
-    e.preventDefault();
-    startDrag(t.clientX, t.clientY);
-  }, { passive: false });
-
-  document.addEventListener("mousemove", (e) => {
+  header.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
     performDrag(e.clientX, e.clientY);
   });
 
-  document.addEventListener("touchmove", (e) => {
-    if (!isDragging) return;          // only intercept when dragging
-    const t = e.touches[0];
-    if (!t) return;
-    e.preventDefault();               // prevent scroll only while dragging
-    performDrag(t.clientX, t.clientY);
-  }, { passive: false });
+  header.addEventListener("pointerup", (e) => {
+    if (!isDragging) return;
+    endDrag();
+    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
+  });
 
-  document.addEventListener("mouseup", endDrag);
-  document.addEventListener("touchend", endDrag);
-  document.addEventListener("touchcancel", endDrag);
+  header.addEventListener("pointercancel", (e) => {
+    if (!isDragging) return;
+    endDrag();
+    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
+  });
 
   /* === OPEN / CLOSE === */
   openMusicBtn.onclick = () => {
@@ -643,7 +634,6 @@ document.addEventListener("DOMContentLoaded", () => {
     ttdWindow.style.display = "none";
   };
 
-  // Extra safety for touch: close on touchend, even if click is suppressed
   btnClose.addEventListener("touchend", (e) => {
     e.preventDefault();
     ttdWindow.style.display = "none";
