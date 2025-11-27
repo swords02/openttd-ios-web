@@ -341,10 +341,6 @@
       height: 120px;
     }
 
-    .jazz-jukebox-header {
-      cursor: default; /* drag disabled on mobile */
-    }
-
     .transport-btn {
       width: 30px;
       height: 30px;
@@ -555,26 +551,80 @@ document.addEventListener("DOMContentLoaded", () => {
     return m + ":" + sec;
   }
 
-  /* === DRAGGABLE WINDOW (desktop only) === */
+  /* === DRAGGABLE WINDOW (mouse + touch) === */
   const header = document.getElementById("ttdWindowHeader");
-  let drag = false, dx = 0, dy = 0;
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let startLeft = 0, startTop = 0;
 
-  function isMobile() {
-    return window.matchMedia("(max-width: 768px)").matches;
+  function getWindowRect() {
+    const rect = ttdWindow.getBoundingClientRect();
+    return {
+      width: rect.width,
+      height: rect.height
+    };
   }
 
-  header.onmousedown = (e) => {
-    if (isMobile()) return; // don't drag on mobile; bottom sheet is fixed
-    drag = true;
-    dx = e.clientX - ttdWindow.offsetLeft;
-    dy = e.clientY - ttdWindow.offsetTop;
-  };
-  document.onmouseup = () => { drag = false; };
-  document.onmousemove = (e) => {
-    if (!drag || isMobile()) return;
-    ttdWindow.style.left = (e.clientX - dx) + "px";
-    ttdWindow.style.top = (e.clientY - dy) + "px";
-  };
+  function startDrag(clientX, clientY) {
+    isDragging = true;
+    dragStartX = clientX;
+    dragStartY = clientY;
+    // Ensure we have numeric left/top
+    const computed = window.getComputedStyle(ttdWindow);
+    startLeft = parseInt(computed.left, 10) || ttdWindow.offsetLeft || 0;
+    startTop  = parseInt(computed.top, 10)  || ttdWindow.offsetTop  || 0;
+  }
+
+  function performDrag(clientX, clientY) {
+    if (!isDragging) return;
+
+    let newLeft = startLeft + (clientX - dragStartX);
+    let newTop  = startTop  + (clientY - dragStartY);
+
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const rect = getWindowRect();
+    const maxLeft = winW - rect.width;
+    const maxTop  = winH - rect.height;
+
+    newLeft = Math.min(Math.max(newLeft, 0), Math.max(maxLeft, 0));
+    newTop  = Math.min(Math.max(newTop, 0), Math.max(maxTop, 0));
+
+    ttdWindow.style.left = newLeft + "px";
+    ttdWindow.style.top  = newTop + "px";
+  }
+
+  function endDrag() {
+    isDragging = false;
+  }
+
+  header.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    startDrag(e.clientX, e.clientY);
+  });
+
+  header.addEventListener("touchstart", (e) => {
+    const t = e.touches[0];
+    if (!t) return;
+    e.preventDefault();
+    startDrag(t.clientX, t.clientY);
+  }, { passive: false });
+
+  document.addEventListener("mousemove", (e) => {
+    performDrag(e.clientX, e.clientY);
+  });
+
+  document.addEventListener("touchmove", (e) => {
+    const t = e.touches[0];
+    if (!t) return;
+    e.preventDefault();
+    performDrag(t.clientX, t.clientY);
+  }, { passive: false });
+
+  document.addEventListener("mouseup", endDrag);
+  document.addEventListener("touchend", endDrag);
+  document.addEventListener("touchcancel", endDrag);
 
   /* === OPEN / CLOSE === */
   openMusicBtn.onclick = () => {
@@ -1166,7 +1216,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         <div class="track-bar-labels">
           <span>Track</span>
-          <span>Programme</span>
         </div>
 
         <div class="track-bar" id="progressBarWrap">
