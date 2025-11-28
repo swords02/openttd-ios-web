@@ -474,6 +474,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  /* === WIRE UP NEXT / PREVIOUS BUTTONS (mouse + touch) === */
+  function bindTransportButton(btn, handler) {
+    if (!btn) return;
+
+    // Mouse / desktop
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      handler();
+    });
+
+    // Mobile touch (prevents ghost clicks, works on iOS Safari, etc.)
+    btn.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      handler();
+    }, { passive: false });
+  }
+
+  bindTransportButton(btnNext, () => nextTrack(false));
+  bindTransportButton(btnPrev, prevTrack);
+
   /* === PLAY/PAUSE BUTTON (with dynamic icon) === */
   function updatePlayPauseIcon() {
     if (!audio) return;
