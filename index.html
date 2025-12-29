@@ -94,28 +94,13 @@
   /* Hide system cursor globally; show pointer over toolbar & Jukebox/etc */
   html, body, canvas, #canvas, * { cursor: none !important; }
   #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle *,
-  .jazz-jukebox-open-btn, .jazz-jukebox-open-btn *,
   .jazz-jukebox-window, .jazz-jukebox-window * {
     cursor: pointer !important;
   }
 
   @media (max-width: 480px){
-    #toolbar{ width: 200px !important; }
+    #toolbar{ width: 220px !important; }              /* a bit wider on small phones */
     #toolbar button{ font-size:15px; padding:12px 14px; }
-  }
-  
-  /* === Jazz Jukebox – Open Button === */
-  .jazz-jukebox-open-btn {
-    position: fixed;
-    left: 12px;
-    bottom: 12px;
-    padding: 3px 10px;
-    font-size: 11px;
-    border: 1px solid #808080;
-    background: #c0c0c0;
-    box-shadow: inset 1px 1px #fff, inset -1px -1px #404040;
-    cursor: pointer;
-    z-index: 9999;
   }
 
   /* === Jazz Jukebox – Window (desktop base) === */
@@ -297,14 +282,6 @@
 
   /* === MOBILE ADAPTATION (bottom sheet style) === */
   @media (max-width: 768px) {
-    .jazz-jukebox-open-btn {
-      left: 50%;
-      bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-      transform: translateX(-50%);
-      padding: 18px 18px;
-      font-size: 13px;
-    }
-
     .jazz-jukebox-window {
       position: fixed;
       left: 0;
@@ -336,7 +313,6 @@
       font-size: 12px;
       padding: 3px 10px;
     }
-        
   }
 </style>
 </head>
@@ -380,7 +356,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const audio = document.getElementById("audioElement");
   const ttdWindow = document.getElementById("ttdWindow");
-  const openMusicBtn = document.getElementById("openMusicBtn");
+  const openMusicBtn = document.getElementById("openMusicBtn"); // now in hamburger menu
 
   const playlistList = document.getElementById("playlistList");
   const playlistCountLabel = document.getElementById("playlistCountLabel");
@@ -405,7 +381,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let isShuffle = false;
   let isRepeat = false;
 
-  /* === OPTIONAL: first-click autoplay (remove this block if you don't want it) === */
+  /* === OPTIONAL: first-click autoplay === */
   let firstPlayArmed = true;
   document.addEventListener("click", function onFirstClick() {
     if (!firstPlayArmed) return;
@@ -478,13 +454,11 @@ document.addEventListener("DOMContentLoaded", () => {
   function bindTransportButton(btn, handler) {
     if (!btn) return;
 
-    // Mouse / desktop
     btn.addEventListener("click", (e) => {
       e.preventDefault();
       handler();
     });
 
-    // Mobile touch (prevents ghost clicks, works on iOS Safari, etc.)
     btn.addEventListener("touchend", (e) => {
       e.preventDefault();
       handler();
@@ -501,11 +475,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   btnPlayPause.onclick = () => {
-    if (audio.paused) {
-      audio.play().catch(()=>{});
-    } else {
-      audio.pause();
-    }
+    if (audio.paused) audio.play().catch(()=>{});
+    else audio.pause();
   };
 
   audio.addEventListener("play", updatePlayPauseIcon);
@@ -590,12 +561,9 @@ document.addEventListener("DOMContentLoaded", () => {
     ttdWindow.style.top  = newTop + "px";
   }
 
-  function endDrag() {
-    isDragging = false;
-  }
+  function endDrag() { isDragging = false; }
 
   header.addEventListener("pointerdown", (e) => {
-    // don't drag when pressing the X button
     if (e.target.closest("#btnClose")) return;
     if (e.pointerType === "mouse" && e.button !== 0) return;
     startDrag(e.clientX, e.clientY);
@@ -622,17 +590,17 @@ document.addEventListener("DOMContentLoaded", () => {
   /* === OPEN / CLOSE === */
   openMusicBtn.onclick = () => {
     ttdWindow.style.display = "flex";
+    // close the hamburger menu after tapping on mobile (nice UX)
+    try { window.__setToolbarVisible && window.__setToolbarVisible(false); } catch(_) {}
     audio.play().catch(()=>{});
   };
 
-  btnClose.onclick = () => {
-    ttdWindow.style.display = "none";
-  };
+  btnClose.onclick = () => { ttdWindow.style.display = "none"; };
 
   btnClose.addEventListener("touchend", (e) => {
     e.preventDefault();
     ttdWindow.style.display = "none";
-  });
+  }, { passive: false });
 
   /* === INIT === */
   buildPlaylist();
@@ -656,6 +624,9 @@ document.addEventListener("DOMContentLoaded", () => {
     <button type="button" onclick="importScenario()">Import Scenario</button>
     <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
     <button type="button" onclick="importHeightmap()">Import Heightmap</button>
+
+    <!-- ✅ Jazz Jukebox moved INTO the hamburger menu -->
+    <button type="button" id="openMusicBtn">Jazz Jukebox</button>
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -698,11 +669,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
     /* Toolbar toggle + persistence */
     const TOOLBAR_KEY = 'openttd_toolbar_visible';
+
     function setToolbar(visible, {persist=true} = {}){
       toolbar.style.display = visible ? 'flex' : 'none';
       toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
       if (persist) { try{ localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); }catch(_){} }
     }
+
+    // expose for jukebox to close menu after tapping
+    window.__setToolbarVisible = (v) => setToolbar(!!v);
+
     toggleBtn.addEventListener('click', (e)=>{
       e.stopPropagation();
       setToolbar(toolbar.style.display !== 'flex');
@@ -1081,7 +1057,7 @@ document.addEventListener("DOMContentLoaded", () => {
   <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
-  <!-- 🔧 Auto-scale UI for mobile / high-DPI displays -->
+  <!-- Auto-scale UI for mobile / high-DPI displays -->
   <script>
   (function () {
     function updateCanvasScale() {
@@ -1188,8 +1164,6 @@ document.addEventListener("DOMContentLoaded", () => {
   </script>
 
   <!-- === Jazz Jukebox Music Player === -->
-  <button class="jazz-jukebox-open-btn" id="openMusicBtn">Jazz Jukebox</button>
-
   <div class="jazz-jukebox-window" id="ttdWindow" style="display:none;">
     <div class="jazz-jukebox-header" id="ttdWindowHeader">
       <span></span>
@@ -1244,29 +1218,16 @@ document.addEventListener("DOMContentLoaded", () => {
   <audio id="audioElement"></audio>
 
 <!--
-<a href="https://forms.gle/1x5KLWHbidK2cBJc8" 
-   target="_blank" 
-   rel="noopener"
-   style="
-     position: fixed;
-     bottom: 20px;
-     right: 75px;
-     z-index: 9999;
-   ">
-  Leave Me Some Feedback!
-</a>
+  <div style="
+    position: fixed;
+    bottom: 20px;
+    right: 75px;
+    z-index: 9999;
+    color: white;
+  ">
+    Leave me a response at feedback.openttdonline.com!
+  </div>
 -->
-
-<div style="
-  position: fixed;
-  bottom: 20px;
-  right: 75px;
-  z-index: 9999;
-  color: white;
-">
-  Leave me a response at feedback.openttdonline.com!
-</div>
-
 
 </body>
 </html>
