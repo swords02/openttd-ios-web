@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD</title>
 
-<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if Pages injects it). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
@@ -32,7 +31,6 @@
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
   #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
 
-  /* Overlay + loading */
   #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
   #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
@@ -41,20 +39,20 @@
   /* --- Toolbar (bottom-right, opens up-left) --- */
   #toolbar{
     position:fixed;
-    bottom: calc(60px + env(safe-area-inset-bottom)); /* above the toggle */
+    bottom: calc(60px + env(safe-area-inset-bottom));
     right:  calc(10px + env(safe-area-inset-right));
     z-index:3;
     background:rgba(0,0,0,.55);
     border:1px solid #333;border-radius:12px;
     padding:8px 10px;
     backdrop-filter:blur(2px);
-    display:none; /* hidden by default */
-    flex-direction:column-reverse !important; /* first item closest to toggle */
+    display:none;
+    flex-direction:column-reverse !important;
     gap:6px !important;
-    width:180px !important;
-    min-width:160px !important;
+    width:200px !important;
+    min-width:170px !important;
     box-sizing:border-box;
-    transform-origin:bottom right; /* anchor near toggle */
+    transform-origin:bottom right;
     -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
@@ -66,7 +64,6 @@
   #toolbar button:active{ transform: scale(0.98); }
   #toolbar button:hover{background:#2b2b2b}
 
-  /* Toggle (bottom-right) */
   #toolbar-toggle{
     position:fixed;
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -91,7 +88,6 @@
   }
   .error{color:#ff6b6b}
 
-  /* Hide system cursor globally; show pointer over toolbar & Jukebox/etc */
   html, body, canvas, #canvas, * { cursor: none !important; }
   #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle *,
   .jazz-jukebox-window, .jazz-jukebox-window * {
@@ -99,7 +95,7 @@
   }
 
   @media (max-width: 480px){
-    #toolbar{ width: 220px !important; }              /* a bit wider on small phones */
+    #toolbar{ width: 220px !important; }
     #toolbar button{ font-size:15px; padding:12px 14px; }
   }
 
@@ -128,7 +124,7 @@
     align-items: center;
     user-select: none;
     cursor: move;
-    touch-action: none; /* important for pointer-based drag on mobile */
+    touch-action: none;
   }
 
   .jazz-jukebox-header .title {
@@ -159,7 +155,6 @@
     gap: 6px;
   }
 
-  /* === LEFT SIDE === */
   .current-track-box {
     border: 1px solid #404040;
     background: #c0c0c0;
@@ -242,7 +237,6 @@
     color: #fff;
   }
 
-  /* === RIGHT SIDE === */
   .playlist-box {
     border: 1px solid #404040;
     background: #c0c0c0;
@@ -280,7 +274,6 @@
     margin-top: 4px;
   }
 
-  /* === MOBILE ADAPTATION (bottom sheet style) === */
   @media (max-width: 768px) {
     .jazz-jukebox-window {
       position: fixed;
@@ -295,7 +288,7 @@
     }
 
     .jazz-jukebox-body {
-      grid-template-columns: 1fr; /* stack controls over playlist */
+      grid-template-columns: 1fr;
       gap: 8px;
     }
 
@@ -317,7 +310,6 @@
 </style>
 </head>
 
-<!-- Jazz Jukebox logic -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const playlist = [
@@ -356,7 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const audio = document.getElementById("audioElement");
   const ttdWindow = document.getElementById("ttdWindow");
-  const openMusicBtn = document.getElementById("openMusicBtn"); // now in hamburger menu
+  const openMusicBtn = document.getElementById("openMusicBtn");
 
   const playlistList = document.getElementById("playlistList");
   const playlistCountLabel = document.getElementById("playlistCountLabel");
@@ -381,7 +373,6 @@ document.addEventListener("DOMContentLoaded", () => {
   let isShuffle = false;
   let isRepeat = false;
 
-  /* === OPTIONAL: first-click autoplay === */
   let firstPlayArmed = true;
   document.addEventListener("click", function onFirstClick() {
     if (!firstPlayArmed) return;
@@ -390,7 +381,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.removeEventListener("click", onFirstClick, true);
   }, { capture: true });
 
-  /* === LOAD TRACK === */
   function loadTrack(index, autoplay = false) {
     currentIndex = index;
     const track = playlist[index];
@@ -406,7 +396,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* === BUILD PLAYLIST === */
   function buildPlaylist() {
     playlistList.innerHTML = "";
     playlist.forEach((track, i) => {
@@ -421,12 +410,8 @@ document.addEventListener("DOMContentLoaded", () => {
     playlistModeLabel.textContent = "";
   }
 
-  /* === NEXT / PREV === */
   function nextTrack(auto = false) {
-    if (isRepeat && auto) {
-      loadTrack(currentIndex, true);
-      return;
-    }
+    if (isRepeat && auto) { loadTrack(currentIndex, true); return; }
     if (isShuffle) {
       let r;
       do r = Math.floor(Math.random() * playlist.length);
@@ -450,25 +435,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  /* === WIRE UP NEXT / PREVIOUS BUTTONS (mouse + touch) === */
   function bindTransportButton(btn, handler) {
     if (!btn) return;
-
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      handler();
-    });
-
-    btn.addEventListener("touchend", (e) => {
-      e.preventDefault();
-      handler();
-    }, { passive: false });
+    btn.addEventListener("click", (e) => { e.preventDefault(); handler(); });
+    btn.addEventListener("touchend", (e) => { e.preventDefault(); handler(); }, { passive: false });
   }
-
   bindTransportButton(btnNext, () => nextTrack(false));
   bindTransportButton(btnPrev, prevTrack);
 
-  /* === PLAY/PAUSE BUTTON (with dynamic icon) === */
   function updatePlayPauseIcon() {
     if (!audio) return;
     btnPlayPause.innerHTML = audio.paused ? "&#9658;" : "&#10074;&#10074;";
@@ -478,31 +452,18 @@ document.addEventListener("DOMContentLoaded", () => {
     if (audio.paused) audio.play().catch(()=>{});
     else audio.pause();
   };
-
   audio.addEventListener("play", updatePlayPauseIcon);
   audio.addEventListener("pause", updatePlayPauseIcon);
 
-  /* === SHUFFLE / REPEAT === */
-  btnShuffle.onclick = () => {
-    isShuffle = !isShuffle;
-    btnShuffle.classList.toggle("toggle-on", isShuffle);
-  };
+  btnShuffle.onclick = () => { isShuffle = !isShuffle; btnShuffle.classList.toggle("toggle-on", isShuffle); };
+  btnRepeat.onclick = () => { isRepeat = !isRepeat; btnRepeat.classList.toggle("toggle-on", isRepeat); };
 
-  btnRepeat.onclick = () => {
-    isRepeat = !isRepeat;
-    btnRepeat.classList.toggle("toggle-on", isRepeat);
-  };
-
-  /* === SEEK === */
   progressBarWrap.onclick = (e) => {
     const rect = progressBarWrap.getBoundingClientRect();
     const ratio = (e.clientX - rect.left) / rect.width;
-    if (!isNaN(audio.duration) && audio.duration > 0) {
-      audio.currentTime = ratio * audio.duration;
-    }
+    if (!isNaN(audio.duration) && audio.duration > 0) audio.currentTime = ratio * audio.duration;
   };
 
-  /* === TIME UPDATE === */
   audio.ontimeupdate = () => {
     currentTimeLabel.textContent = formatTime(audio.currentTime);
     durationLabel.textContent = formatTime(audio.duration);
@@ -512,7 +473,6 @@ document.addEventListener("DOMContentLoaded", () => {
       progressBarFill.style.width = "0%";
     }
   };
-
   audio.onended = () => nextTrack(true);
 
   function formatTime(s) {
@@ -522,7 +482,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return m + ":" + sec;
   }
 
-  /* === DRAGGABLE WINDOW (pointer events for mouse + touch) === */
+  // Draggable window (pointer events)
   let isDragging = false;
   let dragStartX = 0, dragStartY = 0;
   let startLeft = 0, startTop = 0;
@@ -536,7 +496,6 @@ document.addEventListener("DOMContentLoaded", () => {
     isDragging = true;
     dragStartX = clientX;
     dragStartY = clientY;
-
     const computed = window.getComputedStyle(ttdWindow);
     startLeft = parseInt(computed.left, 10) || ttdWindow.offsetLeft || 0;
     startTop  = parseInt(computed.top, 10)  || ttdWindow.offsetTop  || 0;
@@ -544,19 +503,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function performDrag(clientX, clientY) {
     if (!isDragging) return;
-
     let newLeft = startLeft + (clientX - dragStartX);
     let newTop  = startTop  + (clientY - dragStartY);
-
     const winW = window.innerWidth;
     const winH = window.innerHeight;
     const rect = getWindowRect();
     const maxLeft = winW - rect.width;
     const maxTop  = winH - rect.height;
-
     newLeft = Math.min(Math.max(newLeft, 0), Math.max(maxLeft, 0));
     newTop  = Math.min(Math.max(newTop, 0), Math.max(maxTop, 0));
-
     ttdWindow.style.left = newLeft + "px";
     ttdWindow.style.top  = newTop + "px";
   }
@@ -569,64 +524,40 @@ document.addEventListener("DOMContentLoaded", () => {
     startDrag(e.clientX, e.clientY);
     header.setPointerCapture(e.pointerId);
   });
+  header.addEventListener("pointermove", (e) => { if (isDragging) performDrag(e.clientX, e.clientY); });
+  header.addEventListener("pointerup", (e) => { if (!isDragging) return; endDrag(); try { header.releasePointerCapture(e.pointerId); } catch(_) {} });
+  header.addEventListener("pointercancel", (e) => { if (!isDragging) return; endDrag(); try { header.releasePointerCapture(e.pointerId); } catch(_) {} });
 
-  header.addEventListener("pointermove", (e) => {
-    if (!isDragging) return;
-    performDrag(e.clientX, e.clientY);
-  });
-
-  header.addEventListener("pointerup", (e) => {
-    if (!isDragging) return;
-    endDrag();
-    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
-  });
-
-  header.addEventListener("pointercancel", (e) => {
-    if (!isDragging) return;
-    endDrag();
-    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
-  });
-
-  /* === OPEN / CLOSE === */
+  // Open/close
   openMusicBtn.onclick = () => {
     ttdWindow.style.display = "flex";
-    // close the hamburger menu after tapping on mobile (nice UX)
-    try { window.__setToolbarVisible && window.__setToolbarVisible(false); } catch(_) {}
     audio.play().catch(()=>{});
   };
-
   btnClose.onclick = () => { ttdWindow.style.display = "none"; };
+  btnClose.addEventListener("touchend", (e) => { e.preventDefault(); ttdWindow.style.display = "none"; });
 
-  btnClose.addEventListener("touchend", (e) => {
-    e.preventDefault();
-    ttdWindow.style.display = "none";
-  }, { passive: false });
-
-  /* === INIT === */
   buildPlaylist();
   loadTrack(0, false);
   audio.volume = 0.6;
   updatePlayPauseIcon();
 });
 </script>
+</head>
 
 <body>
-  <!-- Toggle -->
   <button id="toolbar-toggle" type="button" aria-label="Toggle tools" aria-pressed="false" title="Tools">
     <span class="icon">☰</span>
   </button>
 
-  <!-- Toolbar -->
   <div id="toolbar">
+    <button type="button" id="openMusicBtn">Jazz Jukebox</button>
     <button type="button" onclick="exportSave()">Export Save</button>
     <button type="button" onclick="importSave()">Import Save</button>
     <button type="button" onclick="exportScenario()">Export Scenario</button>
     <button type="button" onclick="importScenario()">Import Scenario</button>
     <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
     <button type="button" onclick="importHeightmap()">Import Heightmap</button>
-
-    <!-- ✅ Jazz Jukebox moved INTO the hamburger menu -->
-    <button type="button" id="openMusicBtn">Jazz Jukebox</button>
+    <button type="button" onclick="window.__nativeBackupNow && window.__nativeBackupNow()">Backup Now</button>
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -638,13 +569,10 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>
   </div>
 
-  <!-- If this image isn't present, it hides itself (no 404 noise) -->
   <img id="logo" src="overgrown.png" alt="Overgrown logo" onerror="this.style.display='none'">
-
   <div id="filesystem">Saving files…</div>
 
   <script>
-    /* ---------- Robust Emscripten Module bootstrap ---------- */
     (function(){
       var M = window.Module || {};
       if (!Array.isArray(M.preRun))     M.preRun = [];
@@ -653,7 +581,6 @@ document.addEventListener("DOMContentLoaded", () => {
       window.Module = M;
     })();
 
-    /* --- Paths --- */
     const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
     const SCEN_DIR   = LIVE_ROOT + '/scenario/';
@@ -662,30 +589,22 @@ document.addEventListener("DOMContentLoaded", () => {
     const IDB_ROOT   = '/idb';
     const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
 
-    /* UI refs */
     const toolbar   = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
     const logo      = document.getElementById('logo');
 
-    /* Toolbar toggle + persistence */
     const TOOLBAR_KEY = 'openttd_toolbar_visible';
-
     function setToolbar(visible, {persist=true} = {}){
       toolbar.style.display = visible ? 'flex' : 'none';
       toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
       if (persist) { try{ localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); }catch(_){} }
     }
-
-    // expose for jukebox to close menu after tapping
-    window.__setToolbarVisible = (v) => setToolbar(!!v);
-
     toggleBtn.addEventListener('click', (e)=>{
       e.stopPropagation();
       setToolbar(toolbar.style.display !== 'flex');
     });
     try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1', {persist:false}); }catch(_){ setToolbar(false,{persist:false}); }
 
-    /* Auto-hide on outside click/tap + Esc */
     function clickOutsideHandler(e){
       const isOutside = !toolbar.contains(e.target) && !toggleBtn.contains(e.target);
       if (toolbar.style.display === 'flex' && isOutside) setToolbar(false);
@@ -696,7 +615,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.key === 'Escape' && toolbar.style.display === 'flex') setToolbar(false);
     });
 
-    /* Overlay helpers */
     function showGameUI(){
       const ov=document.getElementById('overlay');
       ov.style.opacity=0;
@@ -711,12 +629,11 @@ document.addEventListener("DOMContentLoaded", () => {
       if (logo) logo.style.opacity=1;
     }
 
-    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
     let __idbReady = false;
 
     function mkdirp(path){
       const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
-      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
+      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){ } }
     }
     function exists(path){
       try{ FS.stat(path); return true; }catch(_){ return false; }
@@ -735,7 +652,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const s = srcDir + '/' + name;
         const d = dstDir + '/' + name;
         const st = FS.stat(s);
-        if (st.mode && (st.mode & 0x4000)) { // S_IFDIR
+        if (st.mode && (st.mode & 0x4000)) {
           copyTree(s, d);
         } else {
           copyFile(s, d);
@@ -750,9 +667,8 @@ document.addEventListener("DOMContentLoaded", () => {
           mkdirp(IDB_ROOT);
           let mounted = false;
           try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
-          if (!mounted) {
-            FS.mount(IDBFS, {}, IDB_ROOT);
-          }
+          if (!mounted) FS.mount(IDBFS, {}, IDB_ROOT);
+
           FS.syncfs(true, (err) => {
             if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
             __idbReady = true;
@@ -779,19 +695,14 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // Emergency flush on unload
     window.addEventListener('beforeunload', () => {
       try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
     });
 
-    // Small autosync (every 10s)
     setInterval(() => {
-      if (__idbReady) {
-        try { persistToIDB().catch(()=>{}); } catch(_) {}
-      }
+      if (__idbReady) { try { persistToIDB().catch(()=>{}); } catch(_) {} }
     }, 10000);
 
-    /* FS helpers */
     function newestByMtime(dir, exts){
       try{
         const items = FS.readdir(dir)
@@ -807,7 +718,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }catch(_){ return null; }
     }
 
-    /* ---------- Ensure Module arrays exist before openttd.js uses them ---------- */
     (function(){
       var M = window.Module;
       if (!Array.isArray(M.preRun))     M.preRun = [];
@@ -819,12 +729,10 @@ document.addEventListener("DOMContentLoaded", () => {
       window.Module = M;
     })();
 
-    /* Emscripten hooks */
     Module.preRun.push(function(){
-      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
+      return ensureIDBMounted().catch(()=>{});
     });
 
-    /* ---------- First-run mobile GUI defaults ---------- */
     (function () {
       const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
       async function ensureMobileGuiDefaults() {
@@ -832,7 +740,7 @@ document.addEventListener("DOMContentLoaded", () => {
           if (localStorage.getItem(CFG_INIT_KEY) === '1') return;
           const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
           const vw = Math.min(window.innerWidth, window.innerHeight);
-          if (!isTouch) return; // desktop: skip
+          if (!isTouch) return;
 
           const guiZoom  = (vw <= 820 ? 200 : (vw <= 1080 ? 175 : 150));
           const fontZoom = guiZoom;
@@ -859,7 +767,6 @@ document.addEventListener("DOMContentLoaded", () => {
           await persistToIDB();
 
           localStorage.setItem(CFG_INIT_KEY, '1');
-          console.log('[OpenTTD] Applied first-run mobile GUI defaults:', { guiZoom, fontZoom });
         } catch (e) {
           console.warn('Failed to apply mobile GUI defaults', e);
         }
@@ -927,7 +834,6 @@ document.addEventListener("DOMContentLoaded", () => {
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
-    /* ---------- Mobile-friendly export helpers ---------- */
     function openBlobURLInNewContext(url){
       const win = window.open(url, '_blank', 'noopener');
       if (!win) {
@@ -945,7 +851,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await navigator.share({ files:[file], title: 'OpenTTD export', text: name });
           return;
         }
-      }catch(_){} // ignore and fallback
+      }catch(_){}
 
       const url = URL.createObjectURL(new Blob([data],{type}));
       if (preferOpen) openBlobURLInNewContext(url);
@@ -958,14 +864,6 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(()=>URL.revokeObjectURL(url), 15000);
     }
 
-    function downloadBinary(name, data, type='application/octet-stream'){
-      const a=document.createElement('a');
-      a.href=URL.createObjectURL(new Blob([data],{type}));
-      a.download=name; a.click();
-      setTimeout(()=>URL.revokeObjectURL(a.href),100);
-    }
-
-    /* ---------- Save import/export (live + persistent mirror) ---------- */
     async function exportSave(){
       try{
         const name=newestByMtime(SAVE_DIR,['.sav']);
@@ -985,8 +883,8 @@ document.addEventListener("DOMContentLoaded", () => {
         try{
           await ensureIDBMounted();
           mkdirp(SAVE_DIR); mkdirp(IDB_MIRROR + '/save/');
-          FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));                 // live
-          FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));    // persistent
+          FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
           alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
@@ -994,7 +892,6 @@ document.addEventListener("DOMContentLoaded", () => {
       input.click();
     }
 
-    /* ---------- Scenario import/export ---------- */
     async function exportScenario(){
       try{
         const name=newestByMtime(SCEN_DIR,['.scn']);
@@ -1022,7 +919,6 @@ document.addEventListener("DOMContentLoaded", () => {
       input.click();
     }
 
-    /* ---------- Heightmap import/export ---------- */
     async function exportHeightmap(){
       try{
         const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
@@ -1052,12 +948,97 @@ document.addEventListener("DOMContentLoaded", () => {
         finally{ try{ document.body.removeChild(input); }catch(_){}} };
       input.click();
     }
+
+    /* ===========================
+       Native Backup Bridge (iOS)
+       =========================== */
+
+    function uint8ToBase64(u8) {
+      let s = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < u8.length; i += chunk) {
+        s += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
+      }
+      return btoa(s);
+    }
+
+    function listFilesRecursive(root) {
+      const out = [];
+      function walk(dir) {
+        const entries = readdirSafe(dir);
+        for (const name of entries) {
+          const p = dir.replace(/\/+$/,'') + '/' + name;
+          let st;
+          try { st = FS.stat(p); } catch(_) { continue; }
+          const isDir = st.mode && (st.mode & 0x4000);
+          if (isDir) walk(p);
+          else out.push(p);
+        }
+      }
+      walk(root);
+      return out;
+    }
+
+    async function buildBackupJSON() {
+      await ensureIDBMounted().catch(()=>{});
+      try { await persistToIDB().catch(()=>{}); } catch(_) {}
+
+      const files = [];
+      for (const path of listFilesRecursive(LIVE_ROOT)) {
+        try {
+          const data = FS.readFile(path);
+          files.push({ path, b64: uint8ToBase64(data) });
+        } catch(_) {}
+      }
+      return JSON.stringify({
+        v: 1,
+        root: LIVE_ROOT,
+        ts: Date.now(),
+        files
+      });
+    }
+
+    async function applyBackupJSON(jsonText) {
+      await ensureIDBMounted().catch(()=>{});
+      let payload;
+      try { payload = JSON.parse(jsonText); } catch(e) { throw new Error("Bad backup JSON"); }
+      if (!payload || !Array.isArray(payload.files)) throw new Error("Backup missing files");
+
+      for (const f of payload.files) {
+        if (!f || typeof f.path !== 'string' || typeof f.b64 !== 'string') continue;
+        try {
+          mkdirp(f.path.substring(0, f.path.lastIndexOf('/')));
+          const bin = atob(f.b64);
+          const u8 = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i) & 0xff;
+          FS.writeFile(f.path, u8);
+        } catch(_) {}
+      }
+
+      try { await persistToIDB(); } catch(_) {}
+      return true;
+    }
+
+    // Called by iOS (Swift) via evaluateJavaScript:
+    window.__nativeBackupNow = async function() {
+      const json = await buildBackupJSON();
+      // If the iOS bridge exists, send it up.
+      try {
+        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.openttdBridge) {
+          window.webkit.messageHandlers.openttdBridge.postMessage({ type: "backup", payload: json });
+        }
+      } catch(_) {}
+      return json; // also return for direct evaluateJavaScript use
+    };
+
+    window.__nativeRestoreFromBackup = async function(jsonText) {
+      const ok = await applyBackupJSON(jsonText);
+      return ok;
+    };
   </script>
 
-  <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
-  <!-- Auto-scale UI for mobile / high-DPI displays -->
   <script>
   (function () {
     function updateCanvasScale() {
@@ -1091,79 +1072,77 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
   </script>
 
-  <!-- Existing pinch-zoom handler -->
   <script>
   (function(){
-  const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+    const SENSITIVITY = 0.2;
 
-  function attach(){
-    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
-    if (!canvas) return false;
+    function attach(){
+      const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+      if (!canvas) return false;
 
-    canvas.style.touchAction = 'none';
-    canvas.style.cursor = 'none';
+      canvas.style.touchAction = 'none';
+      canvas.style.cursor = 'none';
 
-    let pA = null, pB = null;
-    let lastDist = 0;
+      let pA = null, pB = null;
+      let lastDist = 0;
 
-    function pinchDist(t1, t2){
-      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      function pinchDist(t1, t2){
+        return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+      }
+
+      canvas.addEventListener('touchstart', e => {
+        if (e.touches.length === 2){
+          e.preventDefault();
+          pA = e.touches[0];
+          pB = e.touches[1];
+          lastDist = pinchDist(pA, pB);
+        }
+      }, {passive:false});
+
+      canvas.addEventListener('touchmove', e => {
+        if (e.touches.length !== 2) return;
+        e.preventDefault();
+
+        const t1 = e.touches[0], t2 = e.touches[1];
+        const dist = pinchDist(t1, t2);
+        const scale = dist / lastDist;
+
+        if (Math.abs(scale - 1) > 0.01) {
+          const cx = (t1.clientX + t2.clientX) / 2;
+          const cy = (t1.clientY + t2.clientY) / 2;
+
+          const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+          canvas.dispatchEvent(new WheelEvent('wheel', {
+            deltaY: -delta,
+            clientX: cx,
+            clientY: cy,
+            bubbles: true
+          }));
+          lastDist = dist;
+        }
+      }, {passive:false});
+
+      canvas.addEventListener('touchend', e => {
+        if (e.touches.length < 2) pA = pB = null;
+      }, {passive:false});
+
+      canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+
+      return true;
     }
 
-    canvas.addEventListener('touchstart', e => {
-      if (e.touches.length === 2){
-        e.preventDefault();
-        pA = e.touches[0];
-        pB = e.touches[1];
-        lastDist = pinchDist(pA, pB);
-      }
-    }, {passive:false});
-
-    canvas.addEventListener('touchmove', e => {
-      if (e.touches.length !== 2) return;
-      e.preventDefault();
-
-      const t1 = e.touches[0], t2 = e.touches[1];
-      const dist = pinchDist(t1, t2);
-      const scale = dist / lastDist;
-
-      if (Math.abs(scale - 1) > 0.01) {
-        const cx = (t1.clientX + t2.clientX) / 2;
-        const cy = (t1.clientY + t2.clientY) / 2;
-
-        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
-        canvas.dispatchEvent(new WheelEvent('wheel', {
-          deltaY: -delta,
-          clientX: cx,
-          clientY: cy,
-          bubbles: true
-        }));
-        lastDist = dist;
-      }
-    }, {passive:false});
-
-    canvas.addEventListener('touchend', e => {
-      if (e.touches.length < 2) pA = pB = null;
-    }, {passive:false});
-
-    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
-
-    return true;
-  }
-
-  if (!attach()){
-    const prev = (window.Module && Module.onRuntimeInitialized) || null;
-    window.Module = window.Module || {};
-    Module.onRuntimeInitialized = function(){
-      if (prev) prev();
-      attach();
-    };
-    window.addEventListener('load', () => setTimeout(attach, 0));
+    if (!attach()){
+      const prev = (window.Module && Module.onRuntimeInitialized) || null;
+      window.Module = window.Module || {};
+      Module.onRuntimeInitialized = function(){
+        if (prev) prev();
+        attach();
+      };
+      window.addEventListener('load', () => setTimeout(attach, 0));
     }
   })();
   </script>
 
-  <!-- === Jazz Jukebox Music Player === -->
   <div class="jazz-jukebox-window" id="ttdWindow" style="display:none;">
     <div class="jazz-jukebox-header" id="ttdWindowHeader">
       <span></span>
@@ -1172,18 +1151,14 @@ document.addEventListener("DOMContentLoaded", () => {
     </div>
 
     <div class="jazz-jukebox-body">
-      <!-- LEFT SIDE -->
       <div class="current-track-box">
-
         <div class="button-row-top">
           <button class="transport-btn" id="btnPrev">&#9664;</button>
           <button class="transport-btn" id="btnNext">&#9654;</button>
           <button class="transport-btn" id="btnPlayPause">&#9658;</button>
         </div>
 
-        <div class="track-bar-labels">
-          <span>Track</span>
-        </div>
+        <div class="track-bar-labels"><span>Track</span></div>
 
         <div class="track-bar" id="progressBarWrap">
           <div class="track-bar-fill" id="progressBarFill"></div>
@@ -1199,10 +1174,8 @@ document.addEventListener("DOMContentLoaded", () => {
           <button class="ttd-btn" id="btnShuffle">Shuffle</button>
           <button class="ttd-btn" id="btnRepeat">Rep</button>
         </div>
-
       </div>
 
-      <!-- RIGHT SIDE -->
       <div class="playlist-box">
         <div class="playlist-header">Track List</div>
         <div class="playlist-list" id="playlistList"></div>
@@ -1228,6 +1201,6 @@ document.addEventListener("DOMContentLoaded", () => {
     Leave me a response at feedback.openttdonline.com!
   </div>
 -->
-
+      
 </body>
 </html>
