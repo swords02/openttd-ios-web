@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenTTD</title>
+
+<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if Pages injects it). -->
+<meta http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self' data: blob:;
+        script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://static.cloudflareinsights.com;
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob:;
+        font-src 'self' data:;
+        object-src 'none';
+        worker-src 'self' blob:;
+        base-uri 'self';
+        connect-src
+          'self'
+          https://cdn.openttd.org
+          https://servers.openttd.org
+          https://bananas.openttd.org
+          wss://bananas-server.openttd.org
+          https://content.openttd.org
+          wss://content.openttd.org:3978
+          https://cloudflareinsights.com;
+        upgrade-insecure-requests;
+      ">
+
+<style>
+  html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
+  #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
+
+  /* Overlay + loading */
+  #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
+  #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+  #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
+  #logo{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);max-width:250px;opacity:0;z-index:2;transition:opacity .6s ease}
+
+  /* --- Toolbar (bottom-right, opens up-left) --- */
+  #toolbar{
+    position:fixed;
+    bottom: calc(60px + env(safe-area-inset-bottom)); /* above the toggle */
+    right:  calc(10px + env(safe-area-inset-right));
+    z-index:3;
+    background:rgba(0,0,0,.55);
+    border:1px solid #333;border-radius:12px;
+    padding:8px 10px;
+    backdrop-filter:blur(2px);
+    display:none; /* hidden by default */
+    flex-direction:column-reverse !important; /* first item closest to toggle */
+    gap:6px !important;
+    width:180px !important;
+    min-width:160px !important;
+    box-sizing:border-box;
+    transform-origin:bottom right; /* anchor near toggle */
+    -webkit-tap-highlight-color: transparent;
+  }
+  #toolbar button{
+    color:#eee;background:#222;border:1px solid #444;border-radius:10px;
+    padding:10px 12px;cursor:pointer;width:100%;text-align:center;
+    font-size:14px;line-height:1.25;transition:background .15s, transform .05s;
+    touch-action:manipulation; -webkit-user-select:none; user-select:none;
+  }
+  #toolbar button:active{ transform: scale(0.98); }
+  #toolbar button:hover{background:#2b2b2b}
+
+  /* Toggle (bottom-right) */
+  #toolbar-toggle{
+    position:fixed;
+    bottom: calc(10px + env(safe-area-inset-bottom));
+    right:  calc(10px + env(safe-area-inset-right));
+    z-index:4;
+    width:42px;height:42px;border-radius:9999px;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(0,0,0,.65);color:#eee;border:1px solid #333;
+    user-select:none;backdrop-filter:blur(2px);
+    opacity:0;animation:fadeIn 0.4s ease forwards 0.3s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  @keyframes fadeIn { to { opacity:1; } }
+  #toolbar-toggle:hover{background:rgba(0,0,0,.78)}
+  #toolbar-toggle .icon{font-size:19px;line-height:1}
+  #toolbar-toggle[aria-pressed="true"]{outline:2px solid #4caf50;outline-offset:1px}
+
+  #filesystem{
+    display:none;position:fixed;bottom:10px;right:10px;
+    background:rgba(0,0,0,.6);padding:8px 10px;border-radius:8px;
+    color:#fff;font-size:13px;border:1px solid #333;z-index:3
+  }
+  .error{color:#ff6b6b}
+
+  /* Hide system cursor globally; show pointer over toolbar & Jukebox/etc */
+  html, body, canvas, #canvas, * { cursor: none !important; }
+  #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle *,
+  .jazz-jukebox-window, .jazz-jukebox-window * {
+    cursor: pointer !important;
+  }
+
+  @media (max-width: 480px){
+    #toolbar{ width: 220px !important; }              /* a bit wider on small phones */
+    #toolbar button{ font-size:15px; padding:12px 14px; }
+  }
+
+  /* === Jazz Jukebox – Window (desktop base) === */
+  .jazz-jukebox-window {
+    width: 520px;
+    max-width: 90vw;
+    background: #c0c0c0;
+    border: 1px solid #000;
+    box-shadow: 0 0 0 1px #404040;
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 80px;
+    left: 80px;
+    z-index: 9998;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  }
+
+  .jazz-jukebox-header {
+    background: #a0a0a0;
+    border-bottom: 1px solid #404040;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+    cursor: move;
+    touch-action: none; /* important for pointer-based drag on mobile */
+  }
+
+  .jazz-jukebox-header .title {
+    margin: 0 auto;
+    color: #f0f0f0;
+    font-weight: bold;
+    font-size: 13px;
+    text-shadow: 1px 1px #404040;
+  }
+
+  .jazz-jukebox-header .btn-close {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+    text-align: center;
+    font-size: 12px;
+    cursor: pointer;
+    line-height: 16px;
+  }
+
+  .jazz-jukebox-body {
+    padding: 6px;
+    background: #b0b0b0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  /* === LEFT SIDE === */
+  .current-track-box {
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    padding: 6px;
+    box-shadow: inset 1px 1px #f8f8f8, inset -1px -1px #808080;
+  }
+
+  .button-row-top {
+    display: flex;
+    gap: 6px;
+  }
+
+  .transport-btn {
+    width: 26px;
+    height: 26px;
+    background: #c0c0c0;
+    border: 1px solid #404040;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .track-bar-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-top: 6px;
+  }
+
+  .track-bar {
+    height: 16px;
+    background: #000;
+    border: 1px solid #404040;
+    position: relative;
+    cursor: pointer;
+    margin-top: 2px;
+  }
+
+  .track-bar-fill {
+    height: 12px;
+    background: #00ff00;
+    margin: 2px;
+    width: 0%;
+  }
+
+  .track-bar-title {
+    position: absolute;
+    top: 0;
+    color: #b8ffb8;
+    font-size: 10px;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    margin-top: 4px;
+  }
+
+  .shuffle-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+
+  .ttd-btn {
+    padding: 2px 8px;
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    box-shadow: inset 1px 1px #fff, inset -1px -1px #808080;
+    cursor: pointer;
+    font-size: 11px;
+  }
+
+  .ttd-btn.toggle-on {
+    background: #808080;
+    color: #fff;
+  }
+
+  /* === RIGHT SIDE === */
+  .playlist-box {
+    border: 1px solid #404040;
+    background: #c0c0c0;
+    padding: 6px;
+  }
+
+  .playlist-header {
+    font-size: 11px;
+    margin-bottom: 4px;
+  }
+
+  .playlist-list {
+    height: 150px;
+    border: 1px solid #404040;
+    overflow-y: auto;
+    background: #b0b0b0;
+  }
+
+  .playlist-item {
+    padding: 2px 4px;
+    font-size: 11px;
+    line-height: 18px;
+    cursor: pointer;
+  }
+
+  .playlist-item.active {
+    background: #000;
+    color: #00ff00;
+  }
+
+  .playlist-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    margin-top: 4px;
+  }
+
+  /* === MOBILE ADAPTATION (bottom sheet style) === */
+  @media (max-width: 768px) {
+    .jazz-jukebox-window {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      top: auto;
+      width: 100%;
+      max-width: 100%;
+      border-radius: 10px 10px 0 0;
+      box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
+    }
+
+    .jazz-jukebox-body {
+      grid-template-columns: 1fr; /* stack controls over playlist */
+      gap: 8px;
+    }
+
+    .playlist-list {
+      height: 120px;
+    }
+
+    .transport-btn {
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+    }
+
+    .ttd-btn {
+      font-size: 12px;
+      padding: 3px 10px;
+    }
+  }
+</style>
+</head>
+
+<!-- Jazz Jukebox logic -->
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const playlist = [
+    { title: "tttheme2", src: "music/tttheme2.mp3" },
+    { title: "5432gone_redfarn", src: "music/5432gone_redfarn.mp3" },
+    { title: "be_sharp_bw_redfarn", src: "music/be_sharp_bw_redfarn.mp3" },
+    { title: "big_man_boogie_redfarn", src: "music/big_man_boogie_redfarn.mp3" },
+    { title: "boogi_marabi_redfarn", src: "music/boogi_marabi_redfarn.mp3" },
+    { title: "busy_schedule", src: "music/busy_schedule.mp3" },
+    { title: "careless_perc_redfarn", src: "music/careless_perc_redfarn.mp3" },
+    { title: "chemistry_lab", src: "music/chemistry_lab.mp3" },
+    { title: "chuggachugga", src: "music/chuggachugga.mp3" },
+    { title: "city_blues_redfarn", src: "music/city_blues_redfarn.mp3" },
+    { title: "coconut_run2", src: "music/coconut_run2.mp3" },
+    { title: "flying_scotsman", src: "music/flying_scotsman.mp3" },
+    { title: "harp_harmony", src: "music/harp_harmony.mp3" },
+    { title: "linns_basket", src: "music/linns_basket.mp3" },
+    { title: "midnight_snow_run", src: "music/midnight_snow_run.mp3" },
+    { title: "mighty_giant_run", src: "music/mighty_giant_run.mp3" },
+    { title: "modern_motion", src: "music/modern_motion.mp3" },
+    { title: "moo_redfarn", src: "music/moo_redfarn.mp3" },
+    { title: "mosey_along_redfarn", src: "music/mosey_along_redfarn.mp3" },
+    { title: "no_work_song_redfarn", src: "music/no_work_song_redfarn.mp3" },
+    { title: "relax_song", src: "music/relax_song.mp3" },
+    { title: "run_for_your_life", src: "music/run_for_your_life.mp3" },
+    { title: "say_what_redfarn", src: "music/say_what_redfarn.mp3" },
+    { title: "slow_neasy_redfarn", src: "music/slow_neasy_redfarn.mp3" },
+    { title: "the_fast_route", src: "music/the_fast_route.mp3" },
+    { title: "the_hobo_redfarn", src: "music/the_hobo_redfarn.mp3" },
+    { title: "train_filled_with_cash", src: "music/train_filled_with_cash.mp3" },
+    { title: "ttsong_iii_imuh3", src: "music/ttsong_iii_imuh3.mp3" },
+    { title: "ttsong_iv_imuh3", src: "music/ttsong_iv_imuh3.mp3" },
+    { title: "ultimate_run", src: "music/ultimate_run.mp3" },
+    { title: "wood_whistles", src: "music/wood_whistles.mp3" }
+  ];
+
+  const audio = document.getElementById("audioElement");
+  const ttdWindow = document.getElementById("ttdWindow");
+  const openMusicBtn = document.getElementById("openMusicBtn"); // now in hamburger menu
+
+  const playlistList = document.getElementById("playlistList");
+  const playlistCountLabel = document.getElementById("playlistCountLabel");
+  const playlistModeLabel = document.getElementById("playlistModeLabel");
+
+  const btnPlayPause = document.getElementById("btnPlayPause");
+  const btnPrev = document.getElementById("btnPrev");
+  const btnNext = document.getElementById("btnNext");
+  const btnShuffle = document.getElementById("btnShuffle");
+  const btnRepeat = document.getElementById("btnRepeat");
+
+  const currentTrackTitle = document.getElementById("currentTrackTitle");
+  const progressBarWrap = document.getElementById("progressBarWrap");
+  const progressBarFill = document.getElementById("progressBarFill");
+  const currentTimeLabel = document.getElementById("currentTimeLabel");
+  const durationLabel = document.getElementById("durationLabel");
+
+  const btnClose = document.getElementById("btnClose");
+  const header = document.getElementById("ttdWindowHeader");
+
+  let currentIndex = 0;
+  let isShuffle = false;
+  let isRepeat = false;
+
+  /* === OPTIONAL: first-click autoplay === */
+  let firstPlayArmed = true;
+  document.addEventListener("click", function onFirstClick() {
+    if (!firstPlayArmed) return;
+    firstPlayArmed = false;
+    audio.play().catch(()=>{});
+    document.removeEventListener("click", onFirstClick, true);
+  }, { capture: true });
+
+  /* === LOAD TRACK === */
+  function loadTrack(index, autoplay = false) {
+    currentIndex = index;
+    const track = playlist[index];
+    audio.src = track.src;
+    currentTrackTitle.textContent = track.title;
+    highlightActive();
+    if (autoplay) audio.play().catch(()=>{});
+  }
+
+  function highlightActive() {
+    document.querySelectorAll(".playlist-item").forEach(el => {
+      el.classList.toggle("active", parseInt(el.dataset.index, 10) === currentIndex);
+    });
+  }
+
+  /* === BUILD PLAYLIST === */
+  function buildPlaylist() {
+    playlistList.innerHTML = "";
+    playlist.forEach((track, i) => {
+      const item = document.createElement("div");
+      item.className = "playlist-item";
+      item.textContent = track.title;
+      item.dataset.index = i;
+      item.onclick = () => loadTrack(i, true);
+      playlistList.appendChild(item);
+    });
+    playlistCountLabel.textContent = playlist.length + " tracks";
+    playlistModeLabel.textContent = "";
+  }
+
+  /* === NEXT / PREV === */
+  function nextTrack(auto = false) {
+    if (isRepeat && auto) {
+      loadTrack(currentIndex, true);
+      return;
+    }
+    if (isShuffle) {
+      let r;
+      do r = Math.floor(Math.random() * playlist.length);
+      while (r === currentIndex);
+      loadTrack(r, true);
+    } else {
+      currentIndex = (currentIndex + 1) % playlist.length;
+      loadTrack(currentIndex, true);
+    }
+  }
+
+  function prevTrack() {
+    if (isShuffle) {
+      let r;
+      do r = Math.floor(Math.random() * playlist.length);
+      while (r === currentIndex);
+      loadTrack(r, true);
+    } else {
+      currentIndex = (currentIndex - 1 + playlist.length) % playlist.length;
+      loadTrack(currentIndex, true);
+    }
+  }
+
+  /* === WIRE UP NEXT / PREVIOUS BUTTONS (mouse + touch) === */
+  function bindTransportButton(btn, handler) {
+    if (!btn) return;
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      handler();
+    });
+
+    btn.addEventListener("touchend", (e) => {
+      e.preventDefault();
+      handler();
+    }, { passive: false });
+  }
+
+  bindTransportButton(btnNext, () => nextTrack(false));
+  bindTransportButton(btnPrev, prevTrack);
+
+  /* === PLAY/PAUSE BUTTON (with dynamic icon) === */
+  function updatePlayPauseIcon() {
+    if (!audio) return;
+    btnPlayPause.innerHTML = audio.paused ? "&#9658;" : "&#10074;&#10074;";
+  }
+
+  btnPlayPause.onclick = () => {
+    if (audio.paused) audio.play().catch(()=>{});
+    else audio.pause();
+  };
+
+  audio.addEventListener("play", updatePlayPauseIcon);
+  audio.addEventListener("pause", updatePlayPauseIcon);
+
+  /* === SHUFFLE / REPEAT === */
+  btnShuffle.onclick = () => {
+    isShuffle = !isShuffle;
+    btnShuffle.classList.toggle("toggle-on", isShuffle);
+  };
+
+  btnRepeat.onclick = () => {
+    isRepeat = !isRepeat;
+    btnRepeat.classList.toggle("toggle-on", isRepeat);
+  };
+
+  /* === SEEK === */
+  progressBarWrap.onclick = (e) => {
+    const rect = progressBarWrap.getBoundingClientRect();
+    const ratio = (e.clientX - rect.left) / rect.width;
+    if (!isNaN(audio.duration) && audio.duration > 0) {
+      audio.currentTime = ratio * audio.duration;
+    }
+  };
+
+  /* === TIME UPDATE === */
+  audio.ontimeupdate = () => {
+    currentTimeLabel.textContent = formatTime(audio.currentTime);
+    durationLabel.textContent = formatTime(audio.duration);
+    if (!isNaN(audio.duration) && audio.duration > 0) {
+      progressBarFill.style.width = (audio.currentTime / audio.duration) * 100 + "%";
+    } else {
+      progressBarFill.style.width = "0%";
+    }
+  };
+
+  audio.onended = () => nextTrack(true);
+
+  function formatTime(s) {
+    if (isNaN(s)) return "0:00";
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60).toString().padStart(2, "0");
+    return m + ":" + sec;
+  }
+
+  /* === DRAGGABLE WINDOW (pointer events for mouse + touch) === */
+  let isDragging = false;
+  let dragStartX = 0, dragStartY = 0;
+  let startLeft = 0, startTop = 0;
+
+  function getWindowRect() {
+    const rect = ttdWindow.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  }
+
+  function startDrag(clientX, clientY) {
+    isDragging = true;
+    dragStartX = clientX;
+    dragStartY = clientY;
+
+    const computed = window.getComputedStyle(ttdWindow);
+    startLeft = parseInt(computed.left, 10) || ttdWindow.offsetLeft || 0;
+    startTop  = parseInt(computed.top, 10)  || ttdWindow.offsetTop  || 0;
+  }
+
+  function performDrag(clientX, clientY) {
+    if (!isDragging) return;
+
+    let newLeft = startLeft + (clientX - dragStartX);
+    let newTop  = startTop  + (clientY - dragStartY);
+
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
+    const rect = getWindowRect();
+    const maxLeft = winW - rect.width;
+    const maxTop  = winH - rect.height;
+
+    newLeft = Math.min(Math.max(newLeft, 0), Math.max(maxLeft, 0));
+    newTop  = Math.min(Math.max(newTop, 0), Math.max(maxTop, 0));
+
+    ttdWindow.style.left = newLeft + "px";
+    ttdWindow.style.top  = newTop + "px";
+  }
+
+  function endDrag() { isDragging = false; }
+
+  header.addEventListener("pointerdown", (e) => {
+    if (e.target.closest("#btnClose")) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    startDrag(e.clientX, e.clientY);
+    header.setPointerCapture(e.pointerId);
+  });
+
+  header.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    performDrag(e.clientX, e.clientY);
+  });
+
+  header.addEventListener("pointerup", (e) => {
+    if (!isDragging) return;
+    endDrag();
+    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
+  });
+
+  header.addEventListener("pointercancel", (e) => {
+    if (!isDragging) return;
+    endDrag();
+    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
+  });
+
+  /* === OPEN / CLOSE === */
+  openMusicBtn.onclick = () => {
+    ttdWindow.style.display = "flex";
+    // close the hamburger menu after tapping on mobile (nice UX)
+    try { window.__setToolbarVisible && window.__setToolbarVisible(false); } catch(_) {}
+    audio.play().catch(()=>{});
+  };
+
+  btnClose.onclick = () => { ttdWindow.style.display = "none"; };
+
+  btnClose.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    ttdWindow.style.display = "none";
+  }, { passive: false });
+
+  /* === INIT === */
+  buildPlaylist();
+  loadTrack(0, false);
+  audio.volume = 0.6;
+  updatePlayPauseIcon();
+});
+</script>
+
+<body>
+  <!-- Toggle -->
+  <button id="toolbar-toggle" type="button" aria-label="Toggle tools" aria-pressed="false" title="Tools">
+    <span class="icon">☰</span>
+  </button>
+
+  <!-- Toolbar -->
+  <div id="toolbar">
+    <button type="button" onclick="exportSave()">Export Save</button>
+    <button type="button" onclick="importSave()">Import Save</button>
+    <button type="button" onclick="exportScenario()">Export Scenario</button>
+    <button type="button" onclick="importScenario()">Import Scenario</button>
+    <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
+    <button type="button" onclick="importHeightmap()">Import Heightmap</button>
+
+    <!-- ✅ Jazz Jukebox moved INTO the hamburger menu -->
+    <button type="button" id="openMusicBtn">Jazz Jukebox</button>
+  </div>
+
+  <canvas id="canvas" tabindex="-1"></canvas>
+
+  <div id="overlay">
+    <div id="box">
+      <h2 id="title">(0 / 42) Loading ...</h2>
+      <p id="message">Preparing game ...</p>
+    </div>
+  </div>
+
+  <!-- If this image isn't present, it hides itself (no 404 noise) -->
+  <img id="logo" src="overgrown.png" alt="Overgrown logo" onerror="this.style.display='none'">
+
+  <div id="filesystem">Saving files…</div>
+
+  <script>
+    /* ---------- Robust Emscripten Module bootstrap ---------- */
+    (function(){
+      var M = window.Module || {};
+      if (!Array.isArray(M.preRun))     M.preRun = [];
+      if (!Array.isArray(M.postRun))    M.postRun = [];
+      if (!Array.isArray(M.arguments))  M.arguments = [];
+      window.Module = M;
+    })();
+
+    /* --- Paths --- */
+    const LIVE_ROOT  = '/home/web_user/.openttd';
+    const SAVE_DIR   = LIVE_ROOT + '/save/';
+    const SCEN_DIR   = LIVE_ROOT + '/scenario/';
+    const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
+
+    const IDB_ROOT   = '/idb';
+    const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
+
+    /* UI refs */
+    const toolbar   = document.getElementById('toolbar');
+    const toggleBtn = document.getElementById('toolbar-toggle');
+    const logo      = document.getElementById('logo');
+
+    /* Toolbar toggle + persistence */
+    const TOOLBAR_KEY = 'openttd_toolbar_visible';
+
+    function setToolbar(visible, {persist=true} = {}){
+      toolbar.style.display = visible ? 'flex' : 'none';
+      toggleBtn.setAttribute('aria-pressed', visible ? 'true' : 'false');
+      if (persist) { try{ localStorage.setItem(TOOLBAR_KEY, visible ? '1' : '0'); }catch(_){} }
+    }
+
+    // expose for jukebox to close menu after tapping
+    window.__setToolbarVisible = (v) => setToolbar(!!v);
+
+    toggleBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      setToolbar(toolbar.style.display !== 'flex');
+    });
+    try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1', {persist:false}); }catch(_){ setToolbar(false,{persist:false}); }
+
+    /* Auto-hide on outside click/tap + Esc */
+    function clickOutsideHandler(e){
+      const isOutside = !toolbar.contains(e.target) && !toggleBtn.contains(e.target);
+      if (toolbar.style.display === 'flex' && isOutside) setToolbar(false);
+    }
+    document.addEventListener('mousedown', clickOutsideHandler);
+    document.addEventListener('touchstart', clickOutsideHandler, {passive:true});
+    document.addEventListener('keydown', (e)=>{
+      if (e.key === 'Escape' && toolbar.style.display === 'flex') setToolbar(false);
+    });
+
+    /* Overlay helpers */
+    function showGameUI(){
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=0;
+      setTimeout(()=>{ov.style.display='none';},400);
+      if (logo){ logo.style.opacity=0; setTimeout(()=>logo.style.display='none',600); }
+    }
+    function showOverlay(title,msg){
+      const ov=document.getElementById('overlay');
+      ov.style.display='flex'; ov.style.opacity=1;
+      if(title)document.getElementById('title').textContent=title;
+      if(msg)document.getElementById('message').innerHTML=msg;
+      if (logo) logo.style.opacity=1;
+    }
+
+    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
+    let __idbReady = false;
+
+    function mkdirp(path){
+      const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
+      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
+    }
+    function exists(path){
+      try{ FS.stat(path); return true; }catch(_){ return false; }
+    }
+    function readdirSafe(dir){
+      try { return FS.readdir(dir).filter(f=>f!=='.'&&f!=='..'); } catch(_) { return []; }
+    }
+    function copyFile(src, dst){
+      const data = FS.readFile(src);
+      mkdirp(dst.substring(0, dst.lastIndexOf('/')));
+      FS.writeFile(dst, data);
+    }
+    function copyTree(srcDir, dstDir){
+      mkdirp(dstDir);
+      for(const name of readdirSafe(srcDir)){
+        const s = srcDir + '/' + name;
+        const d = dstDir + '/' + name;
+        const st = FS.stat(s);
+        if (st.mode && (st.mode & 0x4000)) { // S_IFDIR
+          copyTree(s, d);
+        } else {
+          copyFile(s, d);
+        }
+      }
+    }
+
+    function ensureIDBMounted() {
+      return new Promise((resolve, reject) => {
+        try {
+          if (__idbReady) return resolve();
+          mkdirp(IDB_ROOT);
+          let mounted = false;
+          try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
+          if (!mounted) {
+            FS.mount(IDBFS, {}, IDB_ROOT);
+          }
+          FS.syncfs(true, (err) => {
+            if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
+            __idbReady = true;
+            if (exists(IDB_MIRROR)) {
+              mkdirp(LIVE_ROOT);
+              copyTree(IDB_MIRROR, LIVE_ROOT);
+            }
+            resolve();
+          });
+        } catch (e) {
+          console.error('IDBFS mount error', e);
+          reject(e);
+        }
+      });
+    }
+
+    function persistToIDB() {
+      return new Promise((resolve, reject) => {
+        try {
+          mkdirp(IDB_MIRROR);
+          copyTree(LIVE_ROOT, IDB_MIRROR);
+          FS.syncfs(false, (err) => err ? reject(err) : resolve());
+        } catch (e) { reject(e); }
+      });
+    }
+
+    // Emergency flush on unload
+    window.addEventListener('beforeunload', () => {
+      try { FS && FS.syncfs && FS.syncfs(false, ()=>{}); } catch(_) {}
+    });
+
+    // Small autosync (every 10s)
+    setInterval(() => {
+      if (__idbReady) {
+        try { persistToIDB().catch(()=>{}); } catch(_) {}
+      }
+    }, 10000);
+
+    /* FS helpers */
+    function newestByMtime(dir, exts){
+      try{
+        const items = FS.readdir(dir)
+          .filter(f=>f!=='.'&&f!=='..')
+          .filter(f=>{
+            const low=f.toLowerCase();
+            return (Array.isArray(exts)? exts : [exts]).some(ext=>low.endsWith(ext));
+          });
+        if(!items.length) return null;
+        let best = items[0], t = 0;
+        for(const f of items){ const st=FS.stat(dir+f); if(st && st.mtime>t){ best=f; t=st.mtime; } }
+        return best;
+      }catch(_){ return null; }
+    }
+
+    /* ---------- Ensure Module arrays exist before openttd.js uses them ---------- */
+    (function(){
+      var M = window.Module;
+      if (!Array.isArray(M.preRun))     M.preRun = [];
+      if (!Array.isArray(M.postRun))    M.postRun = [];
+      if (!Array.isArray(M.arguments))  M.arguments = [];
+      M.totalDependencies = typeof M.totalDependencies === 'number' ? M.totalDependencies : 42;
+      M.doneDependencies  = typeof M.doneDependencies  === 'number' ? M.doneDependencies  : 0;
+      M.lastDependencies  = typeof M.lastDependencies  === 'number' ? M.lastDependencies  : 1;
+      window.Module = M;
+    })();
+
+    /* Emscripten hooks */
+    Module.preRun.push(function(){
+      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
+    });
+
+    /* ---------- First-run mobile GUI defaults ---------- */
+    (function () {
+      const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
+      async function ensureMobileGuiDefaults() {
+        try {
+          if (localStorage.getItem(CFG_INIT_KEY) === '1') return;
+          const isTouch = matchMedia('(pointer: coarse)').matches || ('ontouchstart' in window);
+          const vw = Math.min(window.innerWidth, window.innerHeight);
+          if (!isTouch) return; // desktop: skip
+
+          const guiZoom  = (vw <= 820 ? 200 : (vw <= 1080 ? 175 : 150));
+          const fontZoom = guiZoom;
+
+          await ensureIDBMounted();
+          mkdirp(LIVE_ROOT);
+
+          const cfgPath = LIVE_ROOT + '/openttd.cfg';
+          let cfgText = '';
+          let hasCfg = false;
+          try { cfgText = FS.readFile(cfgPath, { encoding:'utf8' }); hasCfg = true; } catch(_) {}
+
+          if (!hasCfg) {
+            cfgText = `[gui]\ngui_zoom = ${guiZoom}\nfont_zoom = ${fontZoom}\n`;
+          } else {
+            if (!/\n\[gui\]/i.test(cfgText)) cfgText += `\n[gui]\n`;
+            cfgText = cfgText.replace(/(^|\n)\s*gui_zoom\s*=.*(?=\n)/ig, '');
+            cfgText = cfgText.replace(/(^|\n)\s*font_zoom\s*=.*(?=\n)/ig, '');
+            cfgText = cfgText.replace(/\[gui\][^\[]*/i, m =>
+              m + (m.endsWith('\n') ? '' : '\n') + `gui_zoom = ${guiZoom}\nfont_zoom = ${fontZoom}\n`
+            );
+          }
+          FS.writeFile(cfgPath, cfgText);
+          await persistToIDB();
+
+          localStorage.setItem(CFG_INIT_KEY, '1');
+          console.log('[OpenTTD] Applied first-run mobile GUI defaults:', { guiZoom, fontZoom });
+        } catch (e) {
+          console.warn('Failed to apply mobile GUI defaults', e);
+        }
+      }
+      Module.preRun.push(function(){ return ensureMobileGuiDefaults(); });
+    })();
+
+    Module.print   = (...a)=>console.log(a.join(' '));
+    Module.printErr= (...a)=>console.error(a.join(' '));
+
+    Module.canvas = (()=>{
+      var e=document.getElementById("canvas");
+      e.addEventListener("webglcontextlost",ev=>{
+        alert("WebGL context lost. Reload the page."); ev.preventDefault();
+      },false);
+      return e;
+    })();
+
+    Module.setStatus = function(e){
+      const n=e&&e.match&&e.match(/^([^(]+)\((\d+(\.\d+)?)\/(\d+)\)$/);
+      if(n) e = `(${n[2]} / ${n[4]}) ${n[1]}`;
+      document.getElementById("message").innerHTML = e || '';
+      if(e==='Running...') showGameUI();
+    };
+    Module.monitorRunDependencies = function(e){
+      if(e<Module.lastDependencies) Module.doneDependencies++;
+      Module.lastDependencies=e;
+      const total=Module.totalDependencies, doing=Math.min(Module.doneDependencies+1,total);
+      document.getElementById("title").textContent = `(${doing} / ${total}) Loading ...`;
+      document.getElementById("message").textContent = "Preparing game ...";
+    };
+
+    Module.onBootstrap=(bytes,total)=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics",`OpenTTD is downloading base graphics.<br><br>${bytes} / ${total} bytes downloaded.`);
+    };
+    Module.onBootstrapFailed=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Failed to download base graphics.<br>The game cannot start without them.<br><br>Check your connection and reload.");
+    };
+    Module.onBootstrapReload=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Missing base graphics","Download complete.<br>Your browser will reload shortly.");
+    };
+    Module.onExit=()=>{
+      document.getElementById("canvas").style.display="none";
+      showOverlay("Thank you for playing!","Reload your browser to restart.");
+    };
+    Module.onAbort=()=>{
+      document.getElementById("canvas").style.display="none";
+      document.getElementById("box").className="error";
+      showOverlay("Crash :(","The game crashed! Reload to restart.");
+    };
+
+    const _onWarningFsImpl=()=>{
+      const fsEl=document.getElementById('filesystem');
+      fsEl.style.display='inline-block';
+      const ov=document.getElementById('overlay');
+      ov.style.opacity=1;
+      setTimeout(()=>{ ov.style.opacity=0; setTimeout(()=>fsEl.style.display='none',300); }, 3000);
+    };
+    Module.onWarningFs=_onWarningFsImpl;
+    Module.onRuntimeInitialized=()=>showGameUI();
+    Module.postRun.push(showGameUI);
+    Module.locateFile=p=>p;
+    window.onerror=()=>Module.onAbort();
+
+    /* ---------- Mobile-friendly export helpers ---------- */
+    function openBlobURLInNewContext(url){
+      const win = window.open(url, '_blank', 'noopener');
+      if (!win) {
+        const a=document.createElement('a');
+        a.href=url; a.target='_blank'; a.rel='noopener';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
+      }
+    }
+
+    async function shareOrDownload(name, data, type='application/octet-stream', preferOpen=false){
+      try{
+        const file = new File([data], name, { type });
+        if (navigator.canShare && navigator.canShare({ files:[file] })) {
+          await navigator.share({ files:[file], title: 'OpenTTD export', text: name });
+          return;
+        }
+      }catch(_){} // ignore and fallback
+
+      const url = URL.createObjectURL(new Blob([data],{type}));
+      if (preferOpen) openBlobURLInNewContext(url);
+      else {
+        const a=document.createElement('a');
+        a.href=url; a.download=name; a.rel='noopener';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ try{ document.body.removeChild(a);}catch(_){} }, 0);
+      }
+      setTimeout(()=>URL.revokeObjectURL(url), 15000);
+    }
+
+    function downloadBinary(name, data, type='application/octet-stream'){
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(new Blob([data],{type}));
+      a.download=name; a.click();
+      setTimeout(()=>URL.revokeObjectURL(a.href),100);
+    }
+
+    /* ---------- Save import/export (live + persistent mirror) ---------- */
+    async function exportSave(){
+      try{
+        const name=newestByMtime(SAVE_DIR,['.sav']);
+        if(!name){alert('No .sav found in '+SAVE_DIR);return;}
+        const data=FS.readFile(SAVE_DIR+name);
+        await shareOrDownload(name, data, 'application/octet-stream', true);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importSave(){
+      const input=document.createElement('input');
+      input.type='file'; input.accept='.sav';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(SAVE_DIR); mkdirp(IDB_MIRROR + '/save/');
+          FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));                 // live
+          FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));    // persistent
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported & saved to browser storage:\n' + SAVE_DIR+f.name);
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
+      input.click();
+    }
+
+    /* ---------- Scenario import/export ---------- */
+    async function exportScenario(){
+      try{
+        const name=newestByMtime(SCEN_DIR,['.scn']);
+        if(!name){alert('No .scn found in '+SCEN_DIR);return;}
+        const data=FS.readFile(SCEN_DIR+name);
+        await shareOrDownload(name, data, 'application/octet-stream', true);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importScenario(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.scn';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(SCEN_DIR); mkdirp(IDB_MIRROR + '/scenario/');
+          FS.writeFile(SCEN_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported & saved to browser storage:\n' + SCEN_DIR+f.name);
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
+      input.click();
+    }
+
+    /* ---------- Heightmap import/export ---------- */
+    async function exportHeightmap(){
+      try{
+        const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
+        if(!name){alert('No heightmap (.png or .bmp) found in '+HEIGHT_DIR);return;}
+        const data=FS.readFile(HEIGHT_DIR+name);
+        const type = name.toLowerCase().endsWith('.png') ? 'image/png'
+                   : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
+                   : 'application/octet-stream';
+        await shareOrDownload(name, data, type, true);
+      }catch(e){alert('Export failed: '+e.message);}
+    }
+    async function importHeightmap(){
+      const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp';
+      input.style.position='fixed'; input.style.opacity='0'; input.style.pointerEvents='none';
+      document.body.appendChild(input);
+      input.onchange=async e=>{
+        const f=e.target.files[0]; if(!f){ document.body.removeChild(input); return; }
+        const buf=await f.arrayBuffer();
+        try{
+          await ensureIDBMounted();
+          mkdirp(HEIGHT_DIR); mkdirp(IDB_MIRROR + '/scenario/heightmap/');
+          FS.writeFile(HEIGHT_DIR + f.name, new Uint8Array(buf));
+          FS.writeFile(IDB_MIRROR + '/scenario/heightmap/' + f.name, new Uint8Array(buf));
+          await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
+          alert('Imported heightmap & saved to browser storage:\n' + HEIGHT_DIR+f.name + '\n\nLoad via Scenario Editor → Heightmap.');
+        }catch(err){console.error(err); alert('Import failed: '+err.message);}
+        finally{ try{ document.body.removeChild(input); }catch(_){}} };
+      input.click();
+    }
+  </script>
+
+  <!-- Load the Emscripten build last -->
+  <script src="openttd.js"></script>
+
+  <!-- Auto-scale UI for mobile / high-DPI displays -->
+  <script>
+  (function () {
+    function updateCanvasScale() {
+      const canvas = document.getElementById('canvas');
+      if (!canvas) return;
+
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const backingW = Math.floor(vw * dpr);
+      const backingH = Math.floor(vh * dpr);
+
+      canvas.width  = backingW;
+      canvas.height = backingH;
+      canvas.style.width  = vw + 'px';
+      canvas.style.height = vh + 'px';
+
+      if (typeof Module !== 'undefined' && Module.setCanvasSize) {
+        Module.setCanvasSize(backingW, backingH, false);
+      }
+
+      canvas.tabIndex = 1;
+      canvas.addEventListener('click', () => canvas.focus(), { once: true });
+    }
+
+    window.addEventListener('resize', updateCanvasScale);
+    window.addEventListener('orientationchange', updateCanvasScale);
+    document.addEventListener('DOMContentLoaded', updateCanvasScale);
+    updateCanvasScale();
+  })();
+  </script>
+
+  <!-- Existing pinch-zoom handler -->
+  <script>
+  (function(){
+  const SENSITIVITY = 0.2; // smaller = slower zoom (try 0.3–0.6)
+
+  function attach(){
+    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+    if (!canvas) return false;
+
+    canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'none';
+
+    let pA = null, pB = null;
+    let lastDist = 0;
+
+    function pinchDist(t1, t2){
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+    }
+
+    canvas.addEventListener('touchstart', e => {
+      if (e.touches.length === 2){
+        e.preventDefault();
+        pA = e.touches[0];
+        pB = e.touches[1];
+        lastDist = pinchDist(pA, pB);
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchmove', e => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault();
+
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const dist = pinchDist(t1, t2);
+      const scale = dist / lastDist;
+
+      if (Math.abs(scale - 1) > 0.01) {
+        const cx = (t1.clientX + t2.clientX) / 2;
+        const cy = (t1.clientY + t2.clientY) / 2;
+
+        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -delta,
+          clientX: cx,
+          clientY: cy,
+          bubbles: true
+        }));
+        lastDist = dist;
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchend', e => {
+      if (e.touches.length < 2) pA = pB = null;
+    }, {passive:false});
+
+    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+
+    return true;
+  }
+
+  if (!attach()){
+    const prev = (window.Module && Module.onRuntimeInitialized) || null;
+    window.Module = window.Module || {};
+    Module.onRuntimeInitialized = function(){
+      if (prev) prev();
+      attach();
+    };
+    window.addEventListener('load', () => setTimeout(attach, 0));
+    }
+  })();
+  </script>
+
+  <!-- === Jazz Jukebox Music Player === -->
+  <div class="jazz-jukebox-window" id="ttdWindow" style="display:none;">
+    <div class="jazz-jukebox-header" id="ttdWindowHeader">
+      <span></span>
+      <div class="title">Jazz Jukebox</div>
+      <div class="btn-close" id="btnClose">X</div>
+    </div>
+
+    <div class="jazz-jukebox-body">
+      <!-- LEFT SIDE -->
+      <div class="current-track-box">
+
+        <div class="button-row-top">
+          <button class="transport-btn" id="btnPrev">&#9664;</button>
+          <button class="transport-btn" id="btnNext">&#9654;</button>
+          <button class="transport-btn" id="btnPlayPause">&#9658;</button>
+        </div>
+
+        <div class="track-bar-labels">
+          <span>Track</span>
+        </div>
+
+        <div class="track-bar" id="progressBarWrap">
+          <div class="track-bar-fill" id="progressBarFill"></div>
+          <div class="track-bar-title" id="currentTrackTitle">---</div>
+        </div>
+
+        <div class="time-row">
+          <span id="currentTimeLabel">0:00</span>
+          <span id="durationLabel">0:00</span>
+        </div>
+
+        <div class="shuffle-row">
+          <button class="ttd-btn" id="btnShuffle">Shuffle</button>
+          <button class="ttd-btn" id="btnRepeat">Rep</button>
+        </div>
+
+      </div>
+
+      <!-- RIGHT SIDE -->
+      <div class="playlist-box">
+        <div class="playlist-header">Track List</div>
+        <div class="playlist-list" id="playlistList"></div>
+
+        <div class="playlist-footer">
+          <span id="playlistCountLabel">0 tracks</span>
+          <span id="playlistModeLabel"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <audio id="audioElement"></audio>
+
+<!--
+  <div style="
+    position: fixed;
+    bottom: 20px;
+    right: 75px;
+    z-index: 9999;
+    color: white;
+  ">
+    Leave me a response at feedback.openttdonline.com!
+  </div>
+-->
+
+</body>
+</html>
