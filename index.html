@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenTTD</title>
 
+<!-- CSP: allow OpenTTD endpoints (+ Cloudflare beacon if Pages injects it). -->
 <meta http-equiv="Content-Security-Policy"
       content="
         default-src 'self' data: blob:;
@@ -31,6 +32,7 @@
   html,body{margin:0;padding:0;height:100%;width:100%;background:#1a1a1a;overflow:hidden}
   #canvas{width:100%;height:100%;display:block;background:#1a1a1a;cursor:none;z-index:1;position:relative}
 
+  /* Overlay + loading */
   #overlay{position:fixed;inset:0;display:flex;justify-content:center;align-items:center;transition:opacity .4s ease;pointer-events:none;z-index:2}
   #box{max-width:720px;text-align:center;color:#eee;font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
   #box h2{margin:.2rem 0 .4rem;font-weight:600;font-size:18px;color:#fff}
@@ -39,20 +41,20 @@
   /* --- Toolbar (bottom-right, opens up-left) --- */
   #toolbar{
     position:fixed;
-    bottom: calc(60px + env(safe-area-inset-bottom));
+    bottom: calc(60px + env(safe-area-inset-bottom)); /* above the toggle */
     right:  calc(10px + env(safe-area-inset-right));
     z-index:3;
     background:rgba(0,0,0,.55);
     border:1px solid #333;border-radius:12px;
     padding:8px 10px;
     backdrop-filter:blur(2px);
-    display:none;
-    flex-direction:column-reverse !important;
+    display:none; /* hidden by default */
+    flex-direction:column-reverse !important; /* first item closest to toggle */
     gap:6px !important;
-    width:200px !important;
-    min-width:170px !important;
+    width:210px !important;
+    min-width:180px !important;
     box-sizing:border-box;
-    transform-origin:bottom right;
+    transform-origin:bottom right; /* anchor near toggle */
     -webkit-tap-highlight-color: transparent;
   }
   #toolbar button{
@@ -64,6 +66,7 @@
   #toolbar button:active{ transform: scale(0.98); }
   #toolbar button:hover{background:#2b2b2b}
 
+  /* Toggle (bottom-right) */
   #toolbar-toggle{
     position:fixed;
     bottom: calc(10px + env(safe-area-inset-bottom));
@@ -88,6 +91,7 @@
   }
   .error{color:#ff6b6b}
 
+  /* Hide system cursor globally; show pointer over toolbar & Jukebox/etc */
   html, body, canvas, #canvas, * { cursor: none !important; }
   #toolbar, #toolbar *, #toolbar-toggle, #toolbar-toggle *,
   .jazz-jukebox-window, .jazz-jukebox-window * {
@@ -95,7 +99,7 @@
   }
 
   @media (max-width: 480px){
-    #toolbar{ width: 220px !important; }
+    #toolbar{ width: 230px !important; }
     #toolbar button{ font-size:15px; padding:12px 14px; }
   }
 
@@ -124,7 +128,7 @@
     align-items: center;
     user-select: none;
     cursor: move;
-    touch-action: none;
+    touch-action: none; /* important for pointer-based drag on mobile */
   }
 
   .jazz-jukebox-header .title {
@@ -155,6 +159,7 @@
     gap: 6px;
   }
 
+  /* === LEFT SIDE === */
   .current-track-box {
     border: 1px solid #404040;
     background: #c0c0c0;
@@ -162,10 +167,7 @@
     box-shadow: inset 1px 1px #f8f8f8, inset -1px -1px #808080;
   }
 
-  .button-row-top {
-    display: flex;
-    gap: 6px;
-  }
+  .button-row-top { display: flex; gap: 6px; }
 
   .transport-btn {
     width: 26px;
@@ -217,11 +219,7 @@
     margin-top: 4px;
   }
 
-  .shuffle-row {
-    display: flex;
-    gap: 6px;
-    margin-top: 6px;
-  }
+  .shuffle-row { display: flex; gap: 6px; margin-top: 6px; }
 
   .ttd-btn {
     padding: 2px 8px;
@@ -232,48 +230,17 @@
     font-size: 11px;
   }
 
-  .ttd-btn.toggle-on {
-    background: #808080;
-    color: #fff;
-  }
+  .ttd-btn.toggle-on { background: #808080; color: #fff; }
 
-  .playlist-box {
-    border: 1px solid #404040;
-    background: #c0c0c0;
-    padding: 6px;
-  }
+  /* === RIGHT SIDE === */
+  .playlist-box { border: 1px solid #404040; background: #c0c0c0; padding: 6px; }
+  .playlist-header { font-size: 11px; margin-bottom: 4px; }
+  .playlist-list { height: 150px; border: 1px solid #404040; overflow-y: auto; background: #b0b0b0; }
+  .playlist-item { padding: 2px 4px; font-size: 11px; line-height: 18px; cursor: pointer; }
+  .playlist-item.active { background: #000; color: #00ff00; }
+  .playlist-footer { display: flex; justify-content: space-between; font-size: 9px; margin-top: 4px; }
 
-  .playlist-header {
-    font-size: 11px;
-    margin-bottom: 4px;
-  }
-
-  .playlist-list {
-    height: 150px;
-    border: 1px solid #404040;
-    overflow-y: auto;
-    background: #b0b0b0;
-  }
-
-  .playlist-item {
-    padding: 2px 4px;
-    font-size: 11px;
-    line-height: 18px;
-    cursor: pointer;
-  }
-
-  .playlist-item.active {
-    background: #000;
-    color: #00ff00;
-  }
-
-  .playlist-footer {
-    display: flex;
-    justify-content: space-between;
-    font-size: 9px;
-    margin-top: 4px;
-  }
-
+  /* === MOBILE ADAPTATION (bottom sheet style) === */
   @media (max-width: 768px) {
     .jazz-jukebox-window {
       position: fixed;
@@ -286,30 +253,37 @@
       border-radius: 10px 10px 0 0;
       box-shadow: 0 -2px 10px rgba(0,0,0,0.5);
     }
+    .jazz-jukebox-body { grid-template-columns: 1fr; gap: 8px; }
+    .playlist-list { height: 120px; }
+    .transport-btn { width: 30px; height: 30px; font-size: 16px; }
+    .ttd-btn { font-size: 12px; padding: 3px 10px; }
+  }
 
-    .jazz-jukebox-body {
-      grid-template-columns: 1fr;
-      gap: 8px;
-    }
-
-    .playlist-list {
-      height: 120px;
-    }
-
-    .transport-btn {
-      width: 30px;
-      height: 30px;
-      font-size: 16px;
-    }
-
-    .ttd-btn {
-      font-size: 12px;
-      padding: 3px 10px;
-    }
+  /* === Toast === */
+  #toast {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    background: rgba(0,0,0,.78);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 12px;
+    padding: 10px 14px;
+    font: 14px/1.2 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    z-index: 10000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .2s ease;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-4px);
   }
 </style>
 </head>
 
+<!-- Jazz Jukebox logic -->
 <script>
 document.addEventListener("DOMContentLoaded", () => {
   const playlist = [
@@ -348,7 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const audio = document.getElementById("audioElement");
   const ttdWindow = document.getElementById("ttdWindow");
-  const openMusicBtn = document.getElementById("openMusicBtn");
+  const openMusicBtn = document.getElementById("openMusicBtn"); // now lives in toolbar
 
   const playlistList = document.getElementById("playlistList");
   const playlistCountLabel = document.getElementById("playlistCountLabel");
@@ -373,6 +347,18 @@ document.addEventListener("DOMContentLoaded", () => {
   let isShuffle = false;
   let isRepeat = false;
 
+  // Toast helper
+  let toastTimer = null;
+  window.__toast = function(msg, ms=1600){
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>el.classList.remove('show'), ms);
+  };
+
+  /* === OPTIONAL: first-click autoplay === */
   let firstPlayArmed = true;
   document.addEventListener("click", function onFirstClick() {
     if (!firstPlayArmed) return;
@@ -411,7 +397,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function nextTrack(auto = false) {
-    if (isRepeat && auto) { loadTrack(currentIndex, true); return; }
+    if (isRepeat && auto) {
+      loadTrack(currentIndex, true);
+      return;
+    }
     if (isShuffle) {
       let r;
       do r = Math.floor(Math.random() * playlist.length);
@@ -455,8 +444,15 @@ document.addEventListener("DOMContentLoaded", () => {
   audio.addEventListener("play", updatePlayPauseIcon);
   audio.addEventListener("pause", updatePlayPauseIcon);
 
-  btnShuffle.onclick = () => { isShuffle = !isShuffle; btnShuffle.classList.toggle("toggle-on", isShuffle); };
-  btnRepeat.onclick = () => { isRepeat = !isRepeat; btnRepeat.classList.toggle("toggle-on", isRepeat); };
+  btnShuffle.onclick = () => {
+    isShuffle = !isShuffle;
+    btnShuffle.classList.toggle("toggle-on", isShuffle);
+  };
+
+  btnRepeat.onclick = () => {
+    isRepeat = !isRepeat;
+    btnRepeat.classList.toggle("toggle-on", isRepeat);
+  };
 
   progressBarWrap.onclick = (e) => {
     const rect = progressBarWrap.getBoundingClientRect();
@@ -482,7 +478,7 @@ document.addEventListener("DOMContentLoaded", () => {
     return m + ":" + sec;
   }
 
-  // Draggable window (pointer events)
+  /* === DRAGGABLE WINDOW === */
   let isDragging = false;
   let dragStartX = 0, dragStartY = 0;
   let startLeft = 0, startTop = 0;
@@ -496,6 +492,7 @@ document.addEventListener("DOMContentLoaded", () => {
     isDragging = true;
     dragStartX = clientX;
     dragStartY = clientY;
+
     const computed = window.getComputedStyle(ttdWindow);
     startLeft = parseInt(computed.left, 10) || ttdWindow.offsetLeft || 0;
     startTop  = parseInt(computed.top, 10)  || ttdWindow.offsetTop  || 0;
@@ -503,15 +500,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function performDrag(clientX, clientY) {
     if (!isDragging) return;
+
     let newLeft = startLeft + (clientX - dragStartX);
     let newTop  = startTop  + (clientY - dragStartY);
+
     const winW = window.innerWidth;
     const winH = window.innerHeight;
     const rect = getWindowRect();
     const maxLeft = winW - rect.width;
     const maxTop  = winH - rect.height;
+
     newLeft = Math.min(Math.max(newLeft, 0), Math.max(maxLeft, 0));
     newTop  = Math.min(Math.max(newTop, 0), Math.max(maxTop, 0));
+
     ttdWindow.style.left = newLeft + "px";
     ttdWindow.style.top  = newTop + "px";
   }
@@ -524,40 +525,63 @@ document.addEventListener("DOMContentLoaded", () => {
     startDrag(e.clientX, e.clientY);
     header.setPointerCapture(e.pointerId);
   });
-  header.addEventListener("pointermove", (e) => { if (isDragging) performDrag(e.clientX, e.clientY); });
-  header.addEventListener("pointerup", (e) => { if (!isDragging) return; endDrag(); try { header.releasePointerCapture(e.pointerId); } catch(_) {} });
-  header.addEventListener("pointercancel", (e) => { if (!isDragging) return; endDrag(); try { header.releasePointerCapture(e.pointerId); } catch(_) {} });
 
-  // Open/close
+  header.addEventListener("pointermove", (e) => {
+    if (!isDragging) return;
+    performDrag(e.clientX, e.clientY);
+  });
+
+  header.addEventListener("pointerup", (e) => {
+    if (!isDragging) return;
+    endDrag();
+    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
+  });
+
+  header.addEventListener("pointercancel", (e) => {
+    if (!isDragging) return;
+    endDrag();
+    try { header.releasePointerCapture(e.pointerId); } catch(_) {}
+  });
+
+  /* === OPEN / CLOSE === */
   openMusicBtn.onclick = () => {
     ttdWindow.style.display = "flex";
     audio.play().catch(()=>{});
   };
-  btnClose.onclick = () => { ttdWindow.style.display = "none"; };
-  btnClose.addEventListener("touchend", (e) => { e.preventDefault(); ttdWindow.style.display = "none"; });
 
+  btnClose.onclick = () => { ttdWindow.style.display = "none"; };
+  btnClose.addEventListener("touchend", (e) => {
+    e.preventDefault();
+    ttdWindow.style.display = "none";
+  });
+
+  /* === INIT === */
   buildPlaylist();
   loadTrack(0, false);
   audio.volume = 0.6;
   updatePlayPauseIcon();
 });
 </script>
-</head>
 
 <body>
+  <!-- Toggle -->
   <button id="toolbar-toggle" type="button" aria-label="Toggle tools" aria-pressed="false" title="Tools">
     <span class="icon">☰</span>
   </button>
 
+  <!-- Toolbar -->
   <div id="toolbar">
-    <button type="button" id="openMusicBtn">Jazz Jukebox</button>
+    <!-- Bottom-most (closest to toggle) due to column-reverse -->
+    <button id="openMusicBtn" type="button">Jazz Jukebox</button>
+    <button id="btnBackupNow" type="button">Backup Now</button>
+    <button id="btnRestoreBackup" type="button">Restore Backup</button>
+
     <button type="button" onclick="exportSave()">Export Save</button>
     <button type="button" onclick="importSave()">Import Save</button>
     <button type="button" onclick="exportScenario()">Export Scenario</button>
     <button type="button" onclick="importScenario()">Import Scenario</button>
     <button type="button" onclick="exportHeightmap()">Export Heightmap</button>
     <button type="button" onclick="importHeightmap()">Import Heightmap</button>
-    <button type="button" onclick="window.__nativeBackupNow && window.__nativeBackupNow()">Backup Now</button>
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -570,9 +594,14 @@ document.addEventListener("DOMContentLoaded", () => {
   </div>
 
   <img id="logo" src="overgrown.png" alt="Overgrown logo" onerror="this.style.display='none'">
+
   <div id="filesystem">Saving files…</div>
 
+  <!-- Toast -->
+  <div id="toast"></div>
+
   <script>
+    /* ---------- Robust Emscripten Module bootstrap ---------- */
     (function(){
       var M = window.Module || {};
       if (!Array.isArray(M.preRun))     M.preRun = [];
@@ -581,18 +610,20 @@ document.addEventListener("DOMContentLoaded", () => {
       window.Module = M;
     })();
 
+    /* --- Paths --- */
     const LIVE_ROOT  = '/home/web_user/.openttd';
     const SAVE_DIR   = LIVE_ROOT + '/save/';
     const SCEN_DIR   = LIVE_ROOT + '/scenario/';
     const HEIGHT_DIR = LIVE_ROOT + '/scenario/heightmap/';
-
     const IDB_ROOT   = '/idb';
     const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
 
+    /* UI refs */
     const toolbar   = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
     const logo      = document.getElementById('logo');
 
+    /* Toolbar toggle + persistence */
     const TOOLBAR_KEY = 'openttd_toolbar_visible';
     function setToolbar(visible, {persist=true} = {}){
       toolbar.style.display = visible ? 'flex' : 'none';
@@ -605,6 +636,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     try{ setToolbar(localStorage.getItem(TOOLBAR_KEY) === '1', {persist:false}); }catch(_){ setToolbar(false,{persist:false}); }
 
+    /* Auto-hide on outside click/tap + Esc */
     function clickOutsideHandler(e){
       const isOutside = !toolbar.contains(e.target) && !toggleBtn.contains(e.target);
       if (toolbar.style.display === 'flex' && isOutside) setToolbar(false);
@@ -615,6 +647,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (e.key === 'Escape' && toolbar.style.display === 'flex') setToolbar(false);
     });
 
+    /* Overlay helpers */
     function showGameUI(){
       const ov=document.getElementById('overlay');
       ov.style.opacity=0;
@@ -629,11 +662,12 @@ document.addEventListener("DOMContentLoaded", () => {
       if (logo) logo.style.opacity=1;
     }
 
+    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
     let __idbReady = false;
 
     function mkdirp(path){
       const parts = path.replace(/\/+$/,'').split('/').filter(Boolean);
-      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){ } }
+      let cur=''; for(const p of parts){ cur+='/'+p; try{ FS.mkdir(cur); }catch(_){/*exists*/} }
     }
     function exists(path){
       try{ FS.stat(path); return true; }catch(_){ return false; }
@@ -652,7 +686,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const s = srcDir + '/' + name;
         const d = dstDir + '/' + name;
         const st = FS.stat(s);
-        if (st.mode && (st.mode & 0x4000)) {
+        if (st.mode && (st.mode & 0x4000)) { // S_IFDIR
           copyTree(s, d);
         } else {
           copyFile(s, d);
@@ -700,7 +734,9 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     setInterval(() => {
-      if (__idbReady) { try { persistToIDB().catch(()=>{}); } catch(_) {} }
+      if (__idbReady) {
+        try { persistToIDB().catch(()=>{}); } catch(_) {}
+      }
     }, 10000);
 
     function newestByMtime(dir, exts){
@@ -718,6 +754,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }catch(_){ return null; }
     }
 
+    /* ---------- Ensure Module arrays exist before openttd.js uses them ---------- */
     (function(){
       var M = window.Module;
       if (!Array.isArray(M.preRun))     M.preRun = [];
@@ -730,9 +767,10 @@ document.addEventListener("DOMContentLoaded", () => {
     })();
 
     Module.preRun.push(function(){
-      return ensureIDBMounted().catch(()=>{});
+      return ensureIDBMounted().catch(()=>{ /* let game start anyway */ });
     });
 
+    /* ---------- First-run mobile GUI defaults ---------- */
     (function () {
       const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
       async function ensureMobileGuiDefaults() {
@@ -767,6 +805,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await persistToIDB();
 
           localStorage.setItem(CFG_INIT_KEY, '1');
+          console.log('[OpenTTD] Applied first-run mobile GUI defaults:', { guiZoom, fontZoom });
         } catch (e) {
           console.warn('Failed to apply mobile GUI defaults', e);
         }
@@ -834,6 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
     Module.locateFile=p=>p;
     window.onerror=()=>Module.onAbort();
 
+    /* ---------- Mobile-friendly export helpers ---------- */
     function openBlobURLInNewContext(url){
       const win = window.open(url, '_blank', 'noopener');
       if (!win) {
@@ -851,7 +891,7 @@ document.addEventListener("DOMContentLoaded", () => {
           await navigator.share({ files:[file], title: 'OpenTTD export', text: name });
           return;
         }
-      }catch(_){}
+      }catch(_){} // ignore and fallback
 
       const url = URL.createObjectURL(new Blob([data],{type}));
       if (preferOpen) openBlobURLInNewContext(url);
@@ -864,6 +904,7 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(()=>URL.revokeObjectURL(url), 15000);
     }
 
+    /* ---------- Save import/export (live + persistent mirror) ---------- */
     async function exportSave(){
       try{
         const name=newestByMtime(SAVE_DIR,['.sav']);
@@ -949,96 +990,182 @@ document.addEventListener("DOMContentLoaded", () => {
       input.click();
     }
 
-    /* ===========================
-       Native Backup Bridge (iOS)
-       =========================== */
+    /* ============================================================
+       APP-LEVEL BACKUP SYSTEM (Native WKWebView bridge)
+       Backs up ONLY OpenTTD user data to the app so iOS purges don't hurt you
+       - openttd.cfg
+       - save/*
+       - scenario/*.scn
+       - scenario/heightmap/*
+       ============================================================ */
 
-    function uint8ToBase64(u8) {
-      let s = '';
-      const chunk = 0x8000;
-      for (let i = 0; i < u8.length; i += chunk) {
-        s += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
-      }
-      return btoa(s);
+    function isInBackupScope(path){
+      if (path === LIVE_ROOT + '/openttd.cfg') return true;
+      if (path.startsWith(SAVE_DIR)) return true;
+      if (path.startsWith(SCEN_DIR)) return true;
+      if (path.startsWith(HEIGHT_DIR)) return true;
+      return false;
     }
 
-    function listFilesRecursive(root) {
-      const out = [];
-      function walk(dir) {
-        const entries = readdirSafe(dir);
-        for (const name of entries) {
-          const p = dir.replace(/\/+$/,'') + '/' + name;
-          let st;
-          try { st = FS.stat(p); } catch(_) { continue; }
-          const isDir = st.mode && (st.mode & 0x4000);
-          if (isDir) walk(p);
-          else out.push(p);
-        }
+    function toBase64(u8){
+      let bin = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < u8.length; i += chunk) {
+        bin += String.fromCharCode.apply(null, u8.subarray(i, i + chunk));
       }
-      walk(root);
+      return btoa(bin);
+    }
+    function fromBase64(b64){
+      const bin = atob(b64);
+      const out = new Uint8Array(bin.length);
+      for (let i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
       return out;
     }
 
-    async function buildBackupJSON() {
-      await ensureIDBMounted().catch(()=>{});
-      try { await persistToIDB().catch(()=>{}); } catch(_) {}
-
-      const files = [];
-      for (const path of listFilesRecursive(LIVE_ROOT)) {
-        try {
-          const data = FS.readFile(path);
-          files.push({ path, b64: uint8ToBase64(data) });
-        } catch(_) {}
+    function listFilesRecursive(dir){
+      const out = [];
+      const names = readdirSafe(dir);
+      for (const name of names){
+        const full = dir.replace(/\/+$/,'') + '/' + name;
+        try{
+          const st = FS.stat(full);
+          if (st.mode && (st.mode & 0x4000)) out.push(...listFilesRecursive(full));
+          else out.push(full);
+        }catch(_){}
       }
-      return JSON.stringify({
+      return out;
+    }
+
+    function collectBackupPayload(){
+      // Must run after FS exists
+      mkdirp(LIVE_ROOT);
+      const files = [];
+
+      const candidates = new Set();
+      // cfg
+      candidates.add(LIVE_ROOT + '/openttd.cfg');
+      // save tree
+      if (exists(SAVE_DIR)) listFilesRecursive(SAVE_DIR).forEach(p=>candidates.add(p));
+      // scenario tree
+      if (exists(SCEN_DIR)) listFilesRecursive(SCEN_DIR).forEach(p=>candidates.add(p));
+
+      for (const path of candidates){
+        if (!isInBackupScope(path)) continue;
+        try{
+          const data = FS.readFile(path);
+          files.push({ path, b64: toBase64(data) });
+        }catch(_){}
+      }
+
+      return {
         v: 1,
-        root: LIVE_ROOT,
         ts: Date.now(),
         files
-      });
+      };
     }
 
-    async function applyBackupJSON(jsonText) {
-      await ensureIDBMounted().catch(()=>{});
-      let payload;
-      try { payload = JSON.parse(jsonText); } catch(e) { throw new Error("Bad backup JSON"); }
-      if (!payload || !Array.isArray(payload.files)) throw new Error("Backup missing files");
+    async function backupNow(){
+      try{
+        // Ensure FS/IDB is ready so LIVE_ROOT reflects latest
+        await ensureIDBMounted().catch(()=>{});
+        // Small flush so files are current
+        try { await persistToIDB().catch(()=>{}); } catch(_) {}
 
-      for (const f of payload.files) {
-        if (!f || typeof f.path !== 'string' || typeof f.b64 !== 'string') continue;
-        try {
+        const payload = collectBackupPayload();
+
+        // If inside iOS app WKWebView bridge:
+        const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.otBackup;
+        if (h && h.postMessage) {
+          h.postMessage(payload);
+          window.__toast && window.__toast('Backing up…');
+          return;
+        }
+
+        // Browser fallback: download JSON
+        const json = JSON.stringify(payload);
+        const url = URL.createObjectURL(new Blob([json],{type:'application/json'}));
+        const a=document.createElement('a');
+        a.href=url; a.download='openttd-backup.json';
+        document.body.appendChild(a); a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(url); try{document.body.removeChild(a);}catch(_){ } }, 0);
+        window.__toast && window.__toast('Backup downloaded');
+      }catch(e){
+        alert('Backup failed: ' + (e && e.message ? e.message : e));
+      }
+    }
+
+    async function applyBackupPayload(payload){
+      if (!payload || !payload.files) throw new Error('Invalid backup');
+
+      await ensureIDBMounted().catch(()=>{});
+      mkdirp(LIVE_ROOT);
+      mkdirp(SAVE_DIR);
+      mkdirp(SCEN_DIR);
+      mkdirp(HEIGHT_DIR);
+
+      for (const f of payload.files){
+        if (!f || !f.path || !f.b64) continue;
+        if (!isInBackupScope(f.path)) continue;
+
+        try{
+          const bytes = fromBase64(f.b64);
           mkdirp(f.path.substring(0, f.path.lastIndexOf('/')));
-          const bin = atob(f.b64);
-          const u8 = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i) & 0xff;
-          FS.writeFile(f.path, u8);
-        } catch(_) {}
+          FS.writeFile(f.path, bytes);
+        }catch(_){}
       }
 
+      // Mirror + sync
       try { await persistToIDB(); } catch(_) {}
-      return true;
     }
 
-    // Called by iOS (Swift) via evaluateJavaScript:
-    window.__nativeBackupNow = async function() {
-      const json = await buildBackupJSON();
-      // If the iOS bridge exists, send it up.
-      try {
-        if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.openttdBridge) {
-          window.webkit.messageHandlers.openttdBridge.postMessage({ type: "backup", payload: json });
-        }
-      } catch(_) {}
-      return json; // also return for direct evaluateJavaScript use
+    // Called by native to inject saved backup
+    window.__applyBackupFromNative = async function(payload){
+      try{
+        await applyBackupPayload(payload);
+        window.__toast && window.__toast('Backup restored ✅', 1800);
+        // Encourage game to reload its FS view
+        // (usually OpenTTD reads saves live; but a full reload is safest)
+        setTimeout(()=>location.reload(), 350);
+      }catch(e){
+        alert('Restore failed: ' + (e && e.message ? e.message : e));
+      }
     };
 
-    window.__nativeRestoreFromBackup = async function(jsonText) {
-      const ok = await applyBackupJSON(jsonText);
-      return ok;
+    // Called by native after it saves the backup file
+    window.__backupSucceededToast = function(){
+      window.__toast && window.__toast('Backup succeeded ✅', 1600);
     };
+
+    // Restore request -> native
+    function requestRestoreFromApp(){
+      const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.otRestore;
+      if (h && h.postMessage) {
+        h.postMessage({ action:'request' });
+        window.__toast && window.__toast('Restoring…');
+      } else {
+        alert('Restore is only available inside the iOS app build.');
+      }
+    }
+
+    // Wire toolbar buttons
+    document.addEventListener('DOMContentLoaded', ()=>{
+      const b1 = document.getElementById('btnBackupNow');
+      const b2 = document.getElementById('btnRestoreBackup');
+      if (b1) b1.addEventListener('click', backupNow);
+      if (b2) b2.addEventListener('click', requestRestoreFromApp);
+    });
+
+    // Optional: auto-backup every 90s inside app
+    setInterval(()=>{
+      const h = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.otBackup;
+      if (h && h.postMessage) backupNow().catch(()=>{});
+    }, 90000);
   </script>
 
+  <!-- Load the Emscripten build last -->
   <script src="openttd.js"></script>
 
+  <!-- 🔧 Auto-scale UI for mobile / high-DPI displays -->
   <script>
   (function () {
     function updateCanvasScale() {
@@ -1072,77 +1199,79 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
   </script>
 
+  <!-- Existing pinch-zoom handler -->
   <script>
   (function(){
-    const SENSITIVITY = 0.2;
+  const SENSITIVITY = 0.2;
 
-    function attach(){
-      const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
-      if (!canvas) return false;
+  function attach(){
+    const canvas = (window.Module && Module.canvas) || document.getElementById('canvas');
+    if (!canvas) return false;
 
-      canvas.style.touchAction = 'none';
-      canvas.style.cursor = 'none';
+    canvas.style.touchAction = 'none';
+    canvas.style.cursor = 'none';
 
-      let pA = null, pB = null;
-      let lastDist = 0;
+    let pA = null, pB = null;
+    let lastDist = 0;
 
-      function pinchDist(t1, t2){
-        return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
-      }
-
-      canvas.addEventListener('touchstart', e => {
-        if (e.touches.length === 2){
-          e.preventDefault();
-          pA = e.touches[0];
-          pB = e.touches[1];
-          lastDist = pinchDist(pA, pB);
-        }
-      }, {passive:false});
-
-      canvas.addEventListener('touchmove', e => {
-        if (e.touches.length !== 2) return;
-        e.preventDefault();
-
-        const t1 = e.touches[0], t2 = e.touches[1];
-        const dist = pinchDist(t1, t2);
-        const scale = dist / lastDist;
-
-        if (Math.abs(scale - 1) > 0.01) {
-          const cx = (t1.clientX + t2.clientX) / 2;
-          const cy = (t1.clientY + t2.clientY) / 2;
-
-          const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
-          canvas.dispatchEvent(new WheelEvent('wheel', {
-            deltaY: -delta,
-            clientX: cx,
-            clientY: cy,
-            bubbles: true
-          }));
-          lastDist = dist;
-        }
-      }, {passive:false});
-
-      canvas.addEventListener('touchend', e => {
-        if (e.touches.length < 2) pA = pB = null;
-      }, {passive:false});
-
-      canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
-
-      return true;
+    function pinchDist(t1, t2){
+      return Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
     }
 
-    if (!attach()){
-      const prev = (window.Module && Module.onRuntimeInitialized) || null;
-      window.Module = window.Module || {};
-      Module.onRuntimeInitialized = function(){
-        if (prev) prev();
-        attach();
-      };
-      window.addEventListener('load', () => setTimeout(attach, 0));
+    canvas.addEventListener('touchstart', e => {
+      if (e.touches.length === 2){
+        e.preventDefault();
+        pA = e.touches[0];
+        pB = e.touches[1];
+        lastDist = pinchDist(pA, pB);
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchmove', e => {
+      if (e.touches.length !== 2) return;
+      e.preventDefault();
+
+      const t1 = e.touches[0], t2 = e.touches[1];
+      const dist = pinchDist(t1, t2);
+      const scale = dist / lastDist;
+
+      if (Math.abs(scale - 1) > 0.01) {
+        const cx = (t1.clientX + t2.clientX) / 2;
+        const cy = (t1.clientY + t2.clientY) / 2;
+
+        const delta = (Math.log(scale) / Math.log(1.05)) * 120 * SENSITIVITY;
+        canvas.dispatchEvent(new WheelEvent('wheel', {
+          deltaY: -delta,
+          clientX: cx,
+          clientY: cy,
+          bubbles: true
+        }));
+        lastDist = dist;
+      }
+    }, {passive:false});
+
+    canvas.addEventListener('touchend', e => {
+      if (e.touches.length < 2) pA = pB = null;
+    }, {passive:false});
+
+    canvas.addEventListener('touchcancel', () => { pA = pB = null; }, {passive:false});
+
+    return true;
+  }
+
+  if (!attach()){
+    const prev = (window.Module && Module.onRuntimeInitialized) || null;
+    window.Module = window.Module || {};
+    Module.onRuntimeInitialized = function(){
+      if (prev) prev();
+      attach();
+    };
+    window.addEventListener('load', () => setTimeout(attach, 0));
     }
   })();
   </script>
 
+  <!-- === Jazz Jukebox Music Player === -->
   <div class="jazz-jukebox-window" id="ttdWindow" style="display:none;">
     <div class="jazz-jukebox-header" id="ttdWindowHeader">
       <span></span>
@@ -1179,7 +1308,6 @@ document.addEventListener("DOMContentLoaded", () => {
       <div class="playlist-box">
         <div class="playlist-header">Track List</div>
         <div class="playlist-list" id="playlistList"></div>
-
         <div class="playlist-footer">
           <span id="playlistCountLabel">0 tracks</span>
           <span id="playlistModeLabel"></span>
