@@ -51,11 +51,22 @@
     display:none; /* hidden by default */
     flex-direction:column-reverse !important; /* first item closest to toggle */
     gap:6px !important;
-    width:210px !important;
-    min-width:180px !important;
+
+    /* ✅ CHANGED: responsive sizing */
+    width: min(92vw, 260px) !important;
+    min-width: 180px !important;
     box-sizing:border-box;
     transform-origin:bottom right; /* anchor near toggle */
     -webkit-tap-highlight-color: transparent;
+
+    /* ✅ ADDED: make it scrollable on iPhone / small heights */
+    max-height: calc(100vh - (70px + env(safe-area-inset-bottom) + env(safe-area-inset-top)));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+
+    /* keeps content from hiding behind iOS home indicator area while scrolling */
+    padding-bottom: calc(8px + env(safe-area-inset-bottom));
   }
   #toolbar button{
     color:#eee;background:#222;border:1px solid #444;border-radius:10px;
@@ -99,7 +110,7 @@
   }
 
   @media (max-width: 480px){
-    #toolbar{ width: 230px !important; }
+    /* ✅ CHANGED: let the min(92vw,260px) rule handle width; keep bigger taps */
     #toolbar button{ font-size:15px; padding:12px 14px; }
   }
 
