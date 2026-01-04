@@ -224,6 +224,76 @@
     opacity: 1;
     transform: translateX(-50%) translateY(-4px);
   }
+
+  /* === Export file picker modal (ADDED) === */
+  #filePickerModal {
+    position: fixed;
+    inset: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 10001;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(2px);
+    -webkit-tap-highlight-color: transparent;
+  }
+  #filePickerModal.show { display: flex; }
+
+  .filePickerCard {
+    width: min(92vw, 460px);
+    background: rgba(0,0,0,.78);
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 14px;
+    padding: 12px;
+    color: #fff;
+    font: 14px/1.25 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  }
+  .filePickerTitle {
+    font-weight: 700;
+    font-size: 15px;
+    margin: 2px 0 10px;
+  }
+  .filePickerSub {
+    opacity: .85;
+    margin: 0 0 10px;
+    font-size: 12.5px;
+  }
+  .filePickerRow {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin: 10px 0;
+  }
+  .filePickerSelect {
+    width: 100%;
+    background: #111;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.20);
+    border-radius: 10px;
+    padding: 10px 10px;
+    font-size: 14px;
+    outline: none;
+  }
+  .filePickerButtons {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+  }
+  .filePickerBtn {
+    background: #222;
+    color: #eee;
+    border: 1px solid rgba(255,255,255,.22);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .filePickerBtn:active{ transform: scale(0.98); }
+  .filePickerBtn.primary {
+    border-color: rgba(76,175,80,.7);
+    outline: 2px solid rgba(76,175,80,.0);
+  }
 </style>
 </head>
 
@@ -476,6 +546,23 @@ document.addEventListener("DOMContentLoaded", () => {
 
     <button id="btnBackupNow" type="button">Backup Now</button>
     <button id="btnRestoreBackup" type="button">Restore Backup</button>
+  </div>
+
+  <!-- File Picker Modal (ADDED) -->
+  <div id="filePickerModal" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="filePickerCard">
+      <div class="filePickerTitle" id="filePickerTitle">Choose a file</div>
+      <div class="filePickerSub" id="filePickerSub">Select which file to export.</div>
+
+      <div class="filePickerRow">
+        <select id="filePickerSelect" class="filePickerSelect"></select>
+      </div>
+
+      <div class="filePickerButtons">
+        <button type="button" class="filePickerBtn" id="filePickerCancel">Cancel</button>
+        <button type="button" class="filePickerBtn primary" id="filePickerExport">Export</button>
+      </div>
+    </div>
   </div>
 
   <canvas id="canvas" tabindex="-1"></canvas>
@@ -787,14 +874,147 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(()=>URL.revokeObjectURL(url), 15000);
     }
 
+    /* ============================================================
+       EXPORT PICKER (ADDED)
+       ============================================================ */
+
+    function listFilesInDirSorted(dir, exts){
+      try{
+        const want = Array.isArray(exts) ? exts : [exts];
+        const items = FS.readdir(dir)
+          .filter(f=>f!=='.'&&f!=='..')
+          .filter(f=>{
+            const low = f.toLowerCase();
+            return want.some(ext => low.endsWith(ext));
+          });
+
+        const withTimes = items.map(name=>{
+          const p = dir + name;
+          let t = 0;
+          try { const st = FS.stat(p); t = st && st.mtime ? st.mtime : 0; } catch(_) {}
+          return { name, t };
+        });
+
+        // newest first
+        withTimes.sort((a,b)=>(b.t||0)-(a.t||0));
+        return withTimes.map(x=>x.name);
+      }catch(_){
+        return [];
+      }
+    }
+
+    function showFilePickerModal({ title, sub, options, onPick }){
+      const modal  = document.getElementById('filePickerModal');
+      const tEl    = document.getElementById('filePickerTitle');
+      const sEl    = document.getElementById('filePickerSub');
+      const sel    = document.getElementById('filePickerSelect');
+      const btnOk  = document.getElementById('filePickerExport');
+      const btnCan = document.getElementById('filePickerCancel');
+
+      if (!modal || !sel || !btnOk || !btnCan || !tEl || !sEl){
+        const pick = options && options[0] && options[0].value;
+        if (pick) onPick(pick);
+        return;
+      }
+
+      tEl.textContent = title || 'Choose a file';
+      sEl.textContent = sub || 'Select which file to export.';
+      sel.innerHTML = '';
+
+      for (const opt of options){
+        const o = document.createElement('option');
+        o.value = opt.value;
+        o.textContent = opt.label;
+        sel.appendChild(o);
+      }
+
+      function close(){
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+        document.removeEventListener('keydown', onKeyDown);
+        modal.removeEventListener('click', onBackdropClick);
+        btnOk.onclick = null;
+        btnCan.onclick = null;
+      }
+
+      function onKeyDown(e){
+        if (e.key === 'Escape') { e.preventDefault(); close(); }
+      }
+      function onBackdropClick(e){
+        if (e.target === modal) close();
+      }
+
+      btnOk.onclick = () => {
+        const v = sel.value;
+        close();
+        onPick(v);
+      };
+      btnCan.onclick = () => close();
+
+      modal.addEventListener('click', onBackdropClick);
+      document.addEventListener('keydown', onKeyDown);
+
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+
+      setTimeout(()=>{ try{ sel.focus(); }catch(_){} }, 0);
+    }
+
+    async function exportFromDirWithPicker({
+      dir,
+      exts,
+      title,
+      sub,
+      mimeForName,   // (name)=>mime string
+      preferOpen=true
+    }){
+      try{
+        const names = listFilesInDirSorted(dir, exts);
+        if (!names.length){
+          alert('No matching file found in ' + dir);
+          return;
+        }
+
+        // If only one file, just export it (no extra tap)
+        if (names.length === 1){
+          const name = names[0];
+          const data = FS.readFile(dir + name);
+          const type = (mimeForName ? mimeForName(name) : 'application/octet-stream');
+          await shareOrDownload(name, data, type, preferOpen);
+          return;
+        }
+
+        const options = names.map(n => ({ value: n, label: n }));
+
+        showFilePickerModal({
+          title: title || 'Choose a file to export',
+          sub: sub || ('From: ' + dir),
+          options,
+          onPick: async (pickedName) => {
+            try{
+              const data = FS.readFile(dir + pickedName);
+              const type = (mimeForName ? mimeForName(pickedName) : 'application/octet-stream');
+              await shareOrDownload(pickedName, data, type, preferOpen);
+            }catch(e){
+              alert('Export failed: ' + (e && e.message ? e.message : e));
+            }
+          }
+        });
+      }catch(e){
+        alert('Export failed: ' + (e && e.message ? e.message : e));
+      }
+    }
+
     /* ---------- Save import/export ---------- */
     async function exportSave(){
-      try{
-        const name=newestByMtime(SAVE_DIR,['.sav']);
-        if(!name){alert('No .sav found in '+SAVE_DIR);return;}
-        const data=FS.readFile(SAVE_DIR+name);
-        await shareOrDownload(name, data, 'application/octet-stream', true);
-      }catch(e){alert('Export failed: '+e.message);}
+      await exportFromDirWithPicker({
+        dir: SAVE_DIR,
+        exts: ['.sav'],
+        title: 'Export Save',
+        sub: 'Pick a .sav file to export.',
+        mimeForName: () => 'application/octet-stream',
+        preferOpen: true
+      });
     }
     async function importSave(){
       const input=document.createElement('input');
@@ -819,12 +1039,14 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function exportScenario(){
-      try{
-        const name=newestByMtime(SCEN_DIR,['.scn']);
-        if(!name){alert('No .scn found in '+SCEN_DIR);return;}
-        const data=FS.readFile(SCEN_DIR+name);
-        await shareOrDownload(name, data, 'application/octet-stream', true);
-      }catch(e){alert('Export failed: '+e.message);}
+      await exportFromDirWithPicker({
+        dir: SCEN_DIR,
+        exts: ['.scn'],
+        title: 'Export Scenario',
+        sub: 'Pick a .scn file to export.',
+        mimeForName: () => 'application/octet-stream',
+        preferOpen: true
+      });
     }
     async function importScenario(){
       const input=document.createElement('input'); input.type='file'; input.accept='.scn';
@@ -847,15 +1069,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     async function exportHeightmap(){
-      try{
-        const name=newestByMtime(HEIGHT_DIR,['.png','.bmp']);
-        if(!name){alert('No heightmap (.png or .bmp) found in '+HEIGHT_DIR);return;}
-        const data=FS.readFile(HEIGHT_DIR+name);
-        const type = name.toLowerCase().endsWith('.png') ? 'image/png'
-                   : name.toLowerCase().endsWith('.bmp') ? 'image/bmp'
-                   : 'application/octet-stream';
-        await shareOrDownload(name, data, type, true);
-      }catch(e){alert('Export failed: '+e.message);}
+      await exportFromDirWithPicker({
+        dir: HEIGHT_DIR,
+        exts: ['.png', '.bmp'],
+        title: 'Export Heightmap',
+        sub: 'Pick a .png or .bmp heightmap to export.',
+        mimeForName: (name) => {
+          const low = name.toLowerCase();
+          if (low.endsWith('.png')) return 'image/png';
+          if (low.endsWith('.bmp')) return 'image/bmp';
+          return 'application/octet-stream';
+        },
+        preferOpen: true
+      });
     }
     async function importHeightmap(){
       const input=document.createElement('input'); input.type='file'; input.accept='.png,.bmp';
