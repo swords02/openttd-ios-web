@@ -22,7 +22,7 @@
           https://bananas.openttd.org
           wss://bananas-server.openttd.org
           https://content.openttd.org
-          wss://content.openttd.org:3978
+          wss://content.openttd.orgl.org:3978
           https://cloudflareinsights.com;
         upgrade-insecure-requests;
       ">
@@ -104,7 +104,7 @@
     #toolbar button{ font-size:15px; padding:12px 14px; }
   }
 
-  /* === Jazz Jukebox === (unchanged styles) */
+  /* Jazz Jukebox (unchanged styles) */
   .jazz-jukebox-window {
     width: 520px;
     max-width: 90vw;
@@ -225,7 +225,7 @@
     transform: translateX(-50%) translateY(-4px);
   }
 
-  /* === Export file picker modal (ADDED) === */
+  /* Export file picker modal (ADDED) */
   #filePickerModal {
     position: fixed;
     inset: 0;
@@ -294,6 +294,10 @@
     border-color: rgba(76,175,80,.7);
     outline: 2px solid rgba(76,175,80,.0);
   }
+
+  /* Show normal cursor over picker */
+  #filePickerModal, #filePickerModal * { cursor: default !important; }
+  #filePickerModal select, #filePickerModal button { cursor: pointer !important; }
 </style>
 </head>
 
@@ -548,7 +552,6 @@ document.addEventListener("DOMContentLoaded", () => {
     <button id="btnRestoreBackup" type="button">Restore Backup</button>
   </div>
 
-  <!-- File Picker Modal (ADDED) -->
   <div id="filePickerModal" role="dialog" aria-modal="true" aria-hidden="true">
     <div class="filePickerCard">
       <div class="filePickerTitle" id="filePickerTitle">Choose a file</div>
@@ -579,7 +582,6 @@ document.addEventListener("DOMContentLoaded", () => {
   <div id="toast"></div>
 
   <script>
-    /* ---------- Robust Emscripten Module bootstrap ---------- */
     (function(){
       var M = window.Module || {};
       if (!Array.isArray(M.preRun))     M.preRun = [];
@@ -595,6 +597,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const IDB_ROOT   = '/idb';
     const IDB_MIRROR = IDB_ROOT + LIVE_ROOT;
+
+    const BUILD_ID  = "15.1-20260213";
+    const BUILD_KEY = "openttd_build_id";
 
     const toolbar   = document.getElementById('toolbar');
     const toggleBtn = document.getElementById('toolbar-toggle');
@@ -636,7 +641,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (logo) logo.style.opacity=1;
     }
 
-    /* ---------- IDBFS at /idb (mirror strategy) ---------- */
     let __idbReady = false;
 
     function mkdirp(path){
@@ -665,18 +669,43 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
+    function clearPersistentCachesOnBuildChange(){
+      try {
+        if (typeof caches !== 'undefined' && caches.keys) {
+          caches.keys().then(keys => keys.forEach(k => caches.delete(k))).catch(()=>{});
+        }
+      } catch(_) {}
+      try {
+        if (indexedDB && indexedDB.databases) {
+          indexedDB.databases().then(dbs => dbs.forEach(db => db && db.name && indexedDB.deleteDatabase(db.name))).catch(()=>{});
+        }
+      } catch(_) {}
+    }
+
     function ensureIDBMounted() {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         try {
-          if (typeof FS === 'undefined' || typeof IDBFS === 'undefined') return resolve(); // FS not ready yet
+          const prev = (() => { try { return localStorage.getItem(BUILD_KEY); } catch(_) { return null; } })();
+          const changed = prev && prev !== BUILD_ID;
+
+          if (changed) {
+            clearPersistentCachesOnBuildChange();
+            try { localStorage.setItem(BUILD_KEY, BUILD_ID); } catch(_) {}
+            __idbReady = false;
+          } else if (!prev) {
+            try { localStorage.setItem(BUILD_KEY, BUILD_ID); } catch(_) {}
+          }
+
+          if (typeof FS === 'undefined' || typeof IDBFS === 'undefined') return resolve();
           if (__idbReady) return resolve();
+
           mkdirp(IDB_ROOT);
           let mounted = false;
           try { mounted = !!FS.lookupPath(IDB_ROOT).node.mounted; } catch(_) {}
           if (!mounted) FS.mount(IDBFS, {}, IDB_ROOT);
 
           FS.syncfs(true, (err) => {
-            if (err) { console.error('IDBFS initial sync failed', err); reject(err); return; }
+            if (err) { console.error('IDBFS initial sync failed', err); return resolve(); }
             __idbReady = true;
             if (exists(IDB_MIRROR)) {
               mkdirp(LIVE_ROOT);
@@ -686,19 +715,19 @@ document.addEventListener("DOMContentLoaded", () => {
           });
         } catch (e) {
           console.error('IDBFS mount error', e);
-          resolve(); // don't block boot
+          resolve();
         }
       });
     }
 
     function persistToIDB() {
-      return new Promise((resolve, reject) => {
+      return new Promise((resolve) => {
         try {
           if (typeof FS === 'undefined') return resolve();
           mkdirp(IDB_MIRROR);
           copyTree(LIVE_ROOT, IDB_MIRROR);
-          FS.syncfs(false, (err) => err ? reject(err) : resolve());
-        } catch (e) { resolve(); }
+          FS.syncfs(false, () => resolve());
+        } catch (_) { resolve(); }
       });
     }
 
@@ -740,7 +769,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return ensureIDBMounted().catch(()=>{});
     });
 
-    /* ---------- First-run mobile GUI defaults ---------- */
     (function () {
       const CFG_INIT_KEY = 'openttd_cfg_initialized_v1';
       async function ensureMobileGuiDefaults() {
@@ -841,10 +869,14 @@ document.addEventListener("DOMContentLoaded", () => {
     Module.onWarningFs=_onWarningFsImpl;
     Module.onRuntimeInitialized=()=>showGameUI();
     Module.postRun.push(showGameUI);
-    Module.locateFile=p=>p;
+
+    Module.locateFile = function(path){
+      const sep = path.includes('?') ? '&' : '?';
+      return path + sep + 'v=' + encodeURIComponent(BUILD_ID);
+    };
+
     window.onerror=()=>Module.onAbort();
 
-    /* ---------- Mobile-friendly export helpers ---------- */
     function openBlobURLInNewContext(url){
       const win = window.open(url, '_blank', 'noopener');
       if (!win) {
@@ -874,10 +906,6 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(()=>URL.revokeObjectURL(url), 15000);
     }
 
-    /* ============================================================
-       EXPORT PICKER (ADDED)
-       ============================================================ */
-
     function listFilesInDirSorted(dir, exts){
       try{
         const want = Array.isArray(exts) ? exts : [exts];
@@ -895,7 +923,6 @@ document.addEventListener("DOMContentLoaded", () => {
           return { name, t };
         });
 
-        // newest first
         withTimes.sort((a,b)=>(b.t||0)-(a.t||0));
         return withTimes.map(x=>x.name);
       }catch(_){
@@ -965,7 +992,7 @@ document.addEventListener("DOMContentLoaded", () => {
       exts,
       title,
       sub,
-      mimeForName,   // (name)=>mime string
+      mimeForName,
       preferOpen=true
     }){
       try{
@@ -975,7 +1002,6 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        // If only one file, just export it (no extra tap)
         if (names.length === 1){
           const name = names[0];
           const data = FS.readFile(dir + name);
@@ -1005,7 +1031,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    /* ---------- Save import/export ---------- */
     async function exportSave(){
       await exportFromDirWithPicker({
         dir: SAVE_DIR,
@@ -1030,8 +1055,7 @@ document.addEventListener("DOMContentLoaded", () => {
           FS.writeFile(SAVE_DIR + f.name, new Uint8Array(buf));
           FS.writeFile(IDB_MIRROR + '/save/' + f.name, new Uint8Array(buf));
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
-          window.__toast && window.__toast('Imported ✅');
-          // small debounce backup after imports
+          window.__toast && window.__toast('Imported');
           scheduleBackupSoon();
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
         finally{ try{ document.body.removeChild(input); }catch(_){}} };
@@ -1061,7 +1085,7 @@ document.addEventListener("DOMContentLoaded", () => {
           FS.writeFile(SCEN_DIR + f.name, new Uint8Array(buf));
           FS.writeFile(IDB_MIRROR + '/scenario/' + f.name, new Uint8Array(buf));
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
-          window.__toast && window.__toast('Imported ✅');
+          window.__toast && window.__toast('Imported');
           scheduleBackupSoon();
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
         finally{ try{ document.body.removeChild(input); }catch(_){}} };
@@ -1096,16 +1120,12 @@ document.addEventListener("DOMContentLoaded", () => {
           FS.writeFile(HEIGHT_DIR + f.name, new Uint8Array(buf));
           FS.writeFile(IDB_MIRROR + '/scenario/heightmap/' + f.name, new Uint8Array(buf));
           await new Promise((res,rej)=>FS.syncfs(false,(err)=>err?rej(err):res()));
-          window.__toast && window.__toast('Imported ✅');
+          window.__toast && window.__toast('Imported');
           scheduleBackupSoon();
         }catch(err){console.error(err); alert('Import failed: '+err.message);}
         finally{ try{ document.body.removeChild(input); }catch(_){}} };
       input.click();
     }
-
-    /* ============================================================
-       APP-LEVEL BACKUP SYSTEM (Native WKWebView bridge)
-       ============================================================ */
 
     function isInBackupScope(path){
       if (path === LIVE_ROOT + '/openttd.cfg') return true;
@@ -1144,7 +1164,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return out;
     }
 
-    // ✅ Limit payload size: keep only N most-recent files per folder
     function takeMostRecent(paths, maxN){
       const withTimes = [];
       for (const p of paths){
@@ -1169,7 +1188,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (exists(SCEN_DIR))   listFilesRecursive(SCEN_DIR).forEach(p=>candidates.add(p));
       if (exists(HEIGHT_DIR)) listFilesRecursive(HEIGHT_DIR).forEach(p=>candidates.add(p));
 
-      // ✅ Reduce scope (important for WK message size)
       const cfg = [LIVE_ROOT + '/openttd.cfg'].filter(p=>exists(p));
       const saves   = takeMostRecent([...candidates].filter(p=>p.startsWith(SAVE_DIR)), 5);
       const scens   = takeMostRecent([...candidates].filter(p=>p.startsWith(SCEN_DIR) && p.toLowerCase().endsWith('.scn')), 5);
@@ -1211,7 +1229,6 @@ document.addEventListener("DOMContentLoaded", () => {
           return;
         }
 
-        // Fallback download (web)
         const json = JSON.stringify(payload);
         const url = URL.createObjectURL(new Blob([json],{type:'application/json'}));
         const a=document.createElement('a');
@@ -1251,7 +1268,7 @@ document.addEventListener("DOMContentLoaded", () => {
     window.__applyBackupFromNative = async function(payload){
       try{
         await applyBackupPayload(payload);
-        window.__toast && window.__toast('Backup restored ✅', 1800);
+        window.__toast && window.__toast('Backup restored', 1800);
         try { sessionStorage.setItem('__ot_silent_restore_done', '1'); } catch(_) {}
         setTimeout(()=>location.reload(), 350);
       }catch(e){
@@ -1260,7 +1277,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     window.__backupSucceededToast = function(){
-      window.__toast && window.__toast('Backup succeeded ✅', 1600);
+      window.__toast && window.__toast('Backup succeeded', 1600);
     };
 
     function requestRestoreFromApp(){
@@ -1273,7 +1290,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // ✅ Only run after FS is ready (runtime initialized)
     async function silentRestoreAfterBoot(){
       try{
         if (sessionStorage.getItem('__ot_silent_restore_done') === '1') return;
@@ -1284,7 +1300,6 @@ document.addEventListener("DOMContentLoaded", () => {
       if (h && h.postMessage) h.postMessage({ action:'request', silent:true });
     }
 
-    // ✅ Auto backup timing (don’t start until FS exists)
     let __backupTimer = null;
     let __backupSoonTimer = null;
 
@@ -1293,7 +1308,7 @@ document.addEventListener("DOMContentLoaded", () => {
       __backupTimer = setInterval(()=>{
         const h = nativeBackupHandler();
         if (h && h.postMessage) backupNow({ silent:true });
-      }, 120000); // every 2 minutes (silent)
+      }, 120000);
     }
 
     function scheduleBackupSoon(){
@@ -1304,7 +1319,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 2500);
     }
 
-    // Wire buttons
     document.addEventListener('DOMContentLoaded', ()=>{
       const b1 = document.getElementById('btnBackupNow');
       const b2 = document.getElementById('btnRestoreBackup');
@@ -1312,29 +1326,25 @@ document.addEventListener("DOMContentLoaded", () => {
       if (b2) b2.addEventListener('click', requestRestoreFromApp);
     });
 
-    // ✅ Boot sequence: AFTER runtime init, do silent restore once + ensure first backup exists + start timers
     (function(){
       const prev = Module.onRuntimeInitialized;
       Module.onRuntimeInitialized = async function(){
         try { if (prev) prev(); } catch(_) {}
 
-        // Ensure FS & IDB are ready
         await ensureIDBMounted().catch(()=>{});
         await persistToIDB().catch(()=>{});
 
-        // Try restore (silent)
         await silentRestoreAfterBoot();
 
-        // Create first backup (silent) shortly after boot so "No backup found" stops
         setTimeout(()=>backupNow({silent:true}), 4000);
 
-        // Start recurring silent backups
         scheduleAutoBackups();
       };
     })();
   </script>
 
-  <script src="openttd.js"></script>
+  <!-- Version-busted loader to prevent cached mismatch -->
+  <script src="openttd.js?v=15.1-20260213"></script>
 
   <script>
   (function () {
