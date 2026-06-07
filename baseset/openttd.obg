@@ -1,0 +1,13 @@
+[metadata]
+name         = OpenTTD
+shortname    = OTTD
+version      = 1
+description  = OpenTTD base graphics
+
+[files]
+base         = openttd.grf
+logos        = orig_extra.grf
+arctic       = orig_extra.grf
+tropical     = orig_extra.grf
+toyland      = orig_extra.grf
+extra        = orig_extra.grf
